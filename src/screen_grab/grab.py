@@ -8,7 +8,8 @@ class ScreenGrab:
     def __init__(self, monitor: int = 1):
         self.monitor_num = monitor
 
-    def process_greyscale(self, frame: np.ndarray) -> np.ndarray:
+    @staticmethod
+    def process_greyscale(frame: np.ndarray) -> np.ndarray:
         return cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY)
 
     def grab(self, coordinates: Optional[tuple] = None, greyscale: bool = False) -> np.ndarray:
@@ -22,5 +23,5 @@ class ScreenGrab:
             screenshot = sct.grab(region)
             frame = np.array(screenshot)
             if greyscale:
-                frame = self.process_greyscale(frame)
+                frame = self.__class__.process_greyscale(frame)
             return frame
