@@ -3,7 +3,7 @@ import numpy as np
 from typing import Optional
 import cv2
 
-
+# This class turns a screenshot of a current monitor and turns it into a matrix, in greyscale or RGB color
 class ScreenGrab:
     def __init__(self, monitor: int = 1):
         self.monitor_num = monitor
