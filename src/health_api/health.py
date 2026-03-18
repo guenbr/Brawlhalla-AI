@@ -1,20 +1,31 @@
-from health_constants import PLAYER_ONE_HEALTH_BAR_REGION, PLAYER_TWO_HEALTH_BAR_REGION
-from health_constants import RGB_TO_PCT
+from health_api.health_constants import RGB_TO_PCT, X_RATIO_P1, X_RATIO_P2, Y_RATIO
 from screen_grab.grab import ScreenGrab
 import numpy as np
-
+import mss
 class HealthAPI():
     
     def __init__(self, monitor: int):
         self.monitor = monitor
-        self.v = np.array()
+        self.v = []
     def process_health(self):
         screen = ScreenGrab(self.monitor)
+        with mss.mss() as sct:
+            monitor = sct.monitors[self.monitor]
+            w, h = monitor['width'], monitor['height']
+        p1 = screen.grab(coordinates=(100, 127, 1, 1), greyscale=False)
+        p2 = screen.grab(coordinates=(2500, 127, 1, 1), greyscale=False)
 
-        p1 = screen.grab(coordinates=PLAYER_ONE_HEALTH_BAR_REGION, greyscale=False)
-        p2 = screen.grab(coordinates=PLAYER_TWO_HEALTH_BAR_REGION, greyscale=False)
+        self.v.append(RGB_TO_PCT[p1])
+        print(self.v)
 
-        self.v.append(RGB_TO_PCT[p1], RGB_TO_PCT[p2])
-
-    def process_lifes(self):
+    def process_lives(self):
         pass
+
+    def get_vector(self):
+        return self.v
+
+def main():
+    test = HealthAPI(monitor=2)
+    test.process_health()
+
+main()
