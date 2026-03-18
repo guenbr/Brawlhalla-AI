@@ -1,7 +1,0 @@
-X_RATIO_P1 = 2400/ 2560
-X_RATIO_P2 = 2530 / 2560
-Y_RATIO = 85/ 956
-
-RGB_TO_PCT = {
-    
-}

@@ -1,23 +1,24 @@
-from health_api.health_constants import RGB_TO_PCT, X_RATIO_P1, X_RATIO_P2, Y_RATIO
 from screen_grab.grab import ScreenGrab
 import numpy as np
-import mss
-class HealthAPI():
-    
+
+class HealthAPI:
     def __init__(self, monitor: int):
         self.monitor = monitor
-        self.v = []
+        self.v = np.array([])
+
     def process_health(self):
         screen = ScreenGrab(self.monitor)
-        with mss.mss() as sct:
-            monitor = sct.monitors[self.monitor]
-            w, h = monitor['width'], monitor['height']
-        p1 = screen.grab(coordinates=(100, 127, 1, 1), greyscale=False)
-        p2 = screen.grab(coordinates=(2500, 127, 1, 1), greyscale=False)
+        p1 = screen.grab(coordinates=(3853, 120, 1, 1), greyscale=False)
+        p2 = screen.grab(coordinates=(3969, 127, 1, 1), greyscale=False)
 
-        self.v.append(RGB_TO_PCT[p1])
+        b1 = p1[0][0][0]
+        b2 = p2[0][0][0]
+
+        self.v = np.array([
+            round((b1 / 255) * 100),
+            round((b2 / 255) * 100)
+        ])
         print(self.v)
-
     def process_lives(self):
         pass
 

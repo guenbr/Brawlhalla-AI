@@ -13,17 +13,16 @@ def get_pixel(x, y):
         b, g, r, a = frame[0][0]
         return r, g, b
 
+def on_click(x, y, button, pressed):
+    if pressed:
+        r, g, b = get_pixel(x, y)
+        print(f"\nClicked: x={x}, y={y} | rgb({r}, {g}, {b}) | hex=#{r:02x}{g:02x}{b:02x}")
+        print(f"Coordinates tuple: ({x}, {y}, 1, 1)", flush=True)
+
 def main():
-    import pyautogui
-    print("Move your mouse to the pixel you want. Press Ctrl+C to stop.\n")
-    try:
-        while True:
-            x, y = pyautogui.position()
-            r, g, b = get_pixel(x, y)
-            print(f"x={x}, y={y} | rgb({r}, {g}, {b}) | hex=#{r:02x}{g:02x}{b:02x}", end="\r", flush=True)
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        print(f"\n\nFinal: x={x}, y={y} | rgb({r}, {g}, {b})")
-        print(f"Coordinates tuple: ({x}, {y}, 1, 1)")
+    from pynput import mouse
+    print("Click anywhere to get coordinates. Press Ctrl+C to stop.\n", flush=True)
+    with mouse.Listener(on_click=on_click) as listener:
+        listener.join()
 
 main()
