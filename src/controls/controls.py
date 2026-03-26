@@ -60,12 +60,7 @@ class Controls:
 
     @staticmethod
     def reset_game():
-        pyautogui.press('esc')
-        time.sleep(1)
-        pyautogui.press('up')
-        time.sleep(1)
-        pyautogui.press('enter')
-        time.sleep(5)
+        time.sleep(2)
         pyautogui.press('c')
         time.sleep(1)
         pyautogui.press('c')
@@ -73,5 +68,15 @@ class Controls:
         pyautogui.press('c')
         time.sleep(1)
         pyautogui.press('c')
-        time.sleep(4)
+        time.sleep(1)
+        pyautogui.press('c')
+        time.sleep(9)
 
+        # return True, means that we have entered a playing state
+        return True
+
+def main():
+    test = Controls()
+    test.reset_game()
+
+main()
