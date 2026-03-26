@@ -46,11 +46,3 @@ class HealthAPI:
     def get_vector(self):
         return self.v
 
-def main():
-    test = HealthAPI(monitor=1)
-    while True:
-        test.process_health()
-        print(test.get_vector())
-        time.sleep(1)
-
-main()
