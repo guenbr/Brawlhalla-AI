@@ -60,7 +60,7 @@ class Controls:
 
     @staticmethod
     def reset_game():
-        time.sleep(2)
+        time.sleep(5)
         pyautogui.press('c')
         time.sleep(1)
         pyautogui.press('c')
