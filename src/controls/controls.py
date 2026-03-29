@@ -75,8 +75,8 @@ class Controls:
         # return True, means that we have entered a playing state
         return True
 
-def main():
-    test = Controls()
-    test.reset_game()
-
-main()
+# def main():
+#     test = Controls()
+#     test.reset_game()
+#
+# main()
