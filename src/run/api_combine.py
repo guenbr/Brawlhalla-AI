@@ -1,13 +1,15 @@
-from screen_grab.grab import ScreenGrab
-from health_api.health import HealthAPI
-#from controls.controls import Controls
+from src.screen_grab.grab import ScreenGrab
+from src.health_api.health import HealthAPI
+from src.controls.controls import Controls
 import numpy as np
 import time
 
 
-monitor = 0
-SCREEN_GRAB = ScreenGrab(monitor=monitor)
-HEALTH_API = HealthAPI()
+MONITOR = 0
+STARTING_LIVES = 99
+
+SCREEN_GRAB = ScreenGrab(monitor=MONITOR)
+HEALTH_API = HealthAPI(starting_lives=STARTING_LIVES)
 
 
 def capture_frame():
@@ -17,25 +19,24 @@ def capture_frame():
     for i in range(4):
         full_frame = SCREEN_GRAB.grab(greyscale=False)
 
-        game_area = SCREEN_GRAB.process_greyscale(full_frame[68:68 + 1313, 1472:1472 + 2541])
+        game_area = SCREEN_GRAB.process_greyscale(full_frame[1:1428, 70:2402])
         frames.append(game_area)
 
-    helper_vectors, is_game_over = get_helper_vectors(full_frame)
+    health_data, is_player_dead, is_game_over = get_helper_vectors(full_frame)
 
     stacked_frames = np.stack(frames, axis=0)
-    return stacked_frames, helper_vectors, is_game_over
+    return stacked_frames, health_data, is_player_dead, is_game_over
 
 def get_helper_vectors(frame):
-    health_vector, game_over, winner, confidences = HEALTH_API.process_frame(frame)
-
+    health_vector, is_player_dead, winner, lives, is_game_over = HEALTH_API.process_frame(frame)
+    # is player dead and is game over used for control sleeping, dont input when is player dead, and call reset game when is game over
+    health_data = np.stack([health_vector, lives], axis=0).T
     # get the x, y coorindates, combine that with the health vector, and total lives left
     # to form matrix
-    #return health_vector, is_game_over
+    return health_data, is_player_dead, is_game_over
 
 def main():
-    while True:
-        x, y, z = capture_frame()
-        print(y, z)
-        time.sleep(1)
+    temp = Controls()
+    temp.reset_game()
 # p1 is ember, p2 is onyx
 main()
