@@ -14,7 +14,7 @@ P1_TEMPLATE_PATH = "player_location/templates/p1_label.png"
 CPU_TEMPLATE_PATH = "player_location/templates/cpu_label.png"
 
 class PlayerDetector:
-    def __init__(self, monitor: int, starting_lives: int = 3):
+    def __init__(self, monitor: int):
         # Create player objects to hold each player's position
         self.player1 = Player(player_id=PLAYER_ONE_ID)
         self.player2 = Player(player_id=PLAYER_TWO_ID)
