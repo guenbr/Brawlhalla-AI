@@ -1,4 +1,4 @@
-from src.screen_grab.grab import ScreenGrab
+from screen_grab.grab import ScreenGrab
 import numpy as np
 import time
 import cv2
