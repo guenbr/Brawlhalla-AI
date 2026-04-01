@@ -1,5 +1,6 @@
 import numpy as np
 import cv2
+import os
 from screen_grab.grab import ScreenGrab
 from player import Player
 
@@ -9,9 +10,11 @@ PLAYER_TWO_ID = 1
 # Minimum confidence needed to count a template match as a valid detection
 MATCH_THRESHOLD = 0.6
 
-# File paths to the saved P1 and CPU label template images
-P1_TEMPLATE_PATH = "player_location/templates/p1_label.png"
-CPU_TEMPLATE_PATH = "player_location/templates/cpu_label.png"
+# File paths relative to this file's location — works on both Mac and Windows
+BASE_DIR          = os.path.dirname(os.path.abspath(__file__))
+P1_TEMPLATE_PATH  = os.path.join(BASE_DIR, "templates", "p1_label.png")
+CPU_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "cpu_label.png")
+
 
 class PlayerDetector:
     def __init__(self, monitor: int):
@@ -23,7 +26,7 @@ class PlayerDetector:
         self.screen = ScreenGrab(monitor=monitor)
 
         # Load templates and their cyan color masks for both labels
-        self.p1_template, self.p1_mask  = self._load_template(P1_TEMPLATE_PATH)
+        self.p1_template,  self.p1_mask  = self._load_template(P1_TEMPLATE_PATH)
         self.cpu_template, self.cpu_mask = self._load_template(CPU_TEMPLATE_PATH)
 
     @staticmethod
@@ -45,7 +48,7 @@ class PlayerDetector:
 
         # Expand the mask slightly to include the text outline pixels
         kernel = np.ones((3, 3), np.uint8)
-        mask = cv2.dilate(mask, kernel, iterations=1)
+        mask   = cv2.dilate(mask, kernel, iterations=1)
 
         # Convert template to grayscale for template matching
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -59,7 +62,7 @@ class PlayerDetector:
 
         # Only scan the middle portion of the screen where players can be
         y_start = int(h * 0.15)
-        y_end = int(h * 0.70)
+        y_end   = int(h * 0.70)
         cropped = frame_bgr[y_start:y_end, :]
 
         # Convert cropped region to grayscale for matching
@@ -92,7 +95,7 @@ class PlayerDetector:
         frame_bgr = cv2.cvtColor(color_frame, cv2.COLOR_BGRA2BGR)
 
         # Search the frame for both player labels
-        p1_pos = self._find_label(frame_bgr, self.p1_template,  self.p1_mask)
+        p1_pos  = self._find_label(frame_bgr, self.p1_template, self.p1_mask)
         cpu_pos = self._find_label(frame_bgr, self.cpu_template, self.cpu_mask)
 
         # Only update position if the label was actually found this frame

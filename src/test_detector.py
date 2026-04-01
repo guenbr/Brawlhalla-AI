@@ -29,7 +29,7 @@ for i in range(total):
 print(f"\nDone! Reviewing {len(frames)} frames. Press N/SPACE for next, Q to quit.")
 
 # Open a resizable window to review all captured frames
-cv2.namedWindow(" Detection Review", cv2.WINDOW_NORMAL)
+cv2.namedWindow("Detection Review", cv2.WINDOW_NORMAL)
 cv2.resizeWindow("Detection Review", 1280, 720)
 
 # Step through each frame one at a time
