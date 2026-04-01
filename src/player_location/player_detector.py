@@ -104,6 +104,14 @@ class PlayerDetector:
         if cpu_pos is not None:
             self.player2.update_position(cpu_pos)
 
+    def get_positions(self) -> np.ndarray:
+        # Returns a 2x2 matrix of player positions
+        # Rows: [P1, CPU] — Columns: [x, y]
+        # If a player hasn't been detected yet, their position defaults to (0, 0)
+        p1_pos  = self.player1.position if self.player1.position is not None else (0, 0)
+        cpu_pos = self.player2.position if self.player2.position is not None else (0, 0)
+        return np.array([p1_pos, cpu_pos])
+
     def get_players(self) -> tuple[Player, Player]:
         # Return both player objects with their current state
         return self.player1, self.player2
