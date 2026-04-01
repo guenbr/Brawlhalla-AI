@@ -15,7 +15,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 P1_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "p1_label.png")
 CPU_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "cpu_label.png")
 
-
 class PlayerDetector:
     def __init__(self, monitor: int):
         # Create player objects to hold each player's position
@@ -104,11 +103,14 @@ class PlayerDetector:
         if cpu_pos is not None:
             self.player2.update_position(cpu_pos)
 
-    def get_positions(self) -> np.ndarray:
+    def get_positions(self, color_frame: np.ndarray | None = None) -> np.ndarray:
+        # Grab a fresh frame and update player positions
+        self.update(color_frame)
+
         # Returns a 2x2 matrix of player positions
         # Rows: [P1, CPU] — Columns: [x, y]
         # If a player hasn't been detected yet, their position defaults to (0, 0)
-        p1_pos  = self.player1.position if self.player1.position is not None else (0, 0)
+        p1_pos = self.player1.position if self.player1.position is not None else (0, 0)
         cpu_pos = self.player2.position if self.player2.position is not None else (0, 0)
         return np.array([p1_pos, cpu_pos])
 
@@ -123,19 +125,18 @@ class PlayerDetector:
 
         frame_bgr = cv2.cvtColor(color_frame, cv2.COLOR_BGRA2BGR)
 
-        # Run detection for each player and draw a dot where they were found
-        for template, mask, label, color in [
-            (self.p1_template,  self.p1_mask,  "P1",  (0, 255, 0)),
-            (self.cpu_template, self.cpu_mask, "CPU", (0, 0, 255)),
-        ]:
-            pos = self._find_label(frame_bgr, template, mask)
-            print(f"{label} detected at: {pos}")
-            if pos:
-                cx, cy = pos
+        # Pass the same frame into get_positions so dots match what's displayed
+        positions = self.get_positions(color_frame)
+
+        # Draw dots for P1 and CPU using positions from the matrix
+        for idx, (label, color) in enumerate([("P1", (0, 255, 0)), ("CPU", (0, 0, 255))]):
+            x, y = positions[idx]
+            print(f"{label} detected at: ({x}, {y})")
+            if (x, y) != (0, 0):
                 # Draw a filled circle at the detected position
-                cv2.circle(frame_bgr, (cx, cy), 6, color, -1)
+                cv2.circle(frame_bgr, (x, y), 6, color, -1)
                 # Draw the label name next to the dot
-                cv2.putText(frame_bgr, label, (cx + 8, cy),
+                cv2.putText(frame_bgr, label, (x + 8, y),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
         return frame_bgr
