@@ -8,11 +8,11 @@ from screen_grab.grab import ScreenGrab
 # python -m player_api.collect_data capture
 # python -m player_api.collect_data label
 
-PATCH_SIZE    = 64
-NEG_PER_POS   = 8
-SAVE_DIR      = "player_api/data"
-RAW_DIR       = "player_api/data/raw_frames"
-MONITOR       = 2
+PATCH_SIZE = 64
+NEG_PER_POS = 8
+SAVE_DIR = "player_api/data"
+RAW_DIR = "player_api/data/raw_frames"
+MONITOR = 2
 CAPTURE_EVERY = 5
 CAPTURE_DURATION = 3600
 

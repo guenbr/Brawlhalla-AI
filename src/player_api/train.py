@@ -8,13 +8,13 @@ from player_api.label_cnn import LabelCNN
 
 # python -m player_api.train
 
-DATA_DIR   = "player_api/data"
-MODEL_DIR  = "player_api/models"
+DATA_DIR = "player_api/data"
+MODEL_DIR = "player_api/models"
 PATCH_SIZE = 64
 BATCH_SIZE = 16
-EPOCHS     = 30
-LR         = 1e-3
-VAL_SPLIT  = 0.2
+EPOCHS = 30
+LR = 1e-3
+VAL_SPLIT = 0.2
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -32,7 +32,7 @@ val_transform = transforms.Compose([
 class PatchDataset(Dataset):
     def __init__(self, label: str, transform):
         self.transform = transform
-        self.samples   = []
+        self.samples = []
 
         pos_dir = os.path.join(DATA_DIR, label, "pos")
         neg_dir = os.path.join(DATA_DIR, label, "neg")
@@ -60,16 +60,16 @@ def train_model(label: str):
     print(f"\nTraining model for: {label}")
 
     full_dataset = PatchDataset(label, train_transform)
-    n_val        = max(1, int(len(full_dataset) * VAL_SPLIT))
-    n_train      = len(full_dataset) - n_val
+    n_val = max(1, int(len(full_dataset) * VAL_SPLIT))
+    n_train = len(full_dataset) - n_val
 
-    train_ds, val_ds     = random_split(full_dataset, [n_train, n_val])
-    val_ds.dataset       = PatchDataset(label, val_transform)
+    train_ds, val_ds = random_split(full_dataset, [n_train, n_val])
+    val_ds.dataset = PatchDataset(label, val_transform)
 
     train_dl = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
-    val_dl   = DataLoader(val_ds,   batch_size=BATCH_SIZE)
+    val_dl = DataLoader(val_ds,   batch_size=BATCH_SIZE)
 
-    model     = LabelCNN()
+    model = LabelCNN()
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="max", patience=5, factor=0.5
@@ -97,13 +97,13 @@ def train_model(label: str):
             for patches, labels in val_dl:
                 preds = (model(patches) >= 0.5).float()
                 correct += (preds == labels).sum().item()
-                total   += labels.size(0)
+                total += labels.size(0)
 
         val_acc = correct / total
         scheduler.step(val_acc)
 
         if val_acc > best_acc:
-            best_acc   = val_acc
+            best_acc = val_acc
             best_state = {k: v.clone() for k, v in model.state_dict().items()}
 
         print(f"  Epoch {epoch:02d}/{EPOCHS} | "

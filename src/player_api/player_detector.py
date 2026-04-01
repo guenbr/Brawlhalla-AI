@@ -25,9 +25,9 @@ class PlayerDetector:
         self.player2 = Player(player_id=PLAYER_TWO_ID)
 
         self.health_api = HealthAPI(monitor=monitor)
-        self.screen     = ScreenGrab(monitor=monitor)
+        self.screen = ScreenGrab(monitor=monitor)
 
-        self.p1_model  = self._load_model(p1_model_path)
+        self.p1_model = self._load_model(p1_model_path)
         self.cpu_model = self._load_model(cpu_model_path)
 
         self.transform = transforms.Compose([
@@ -44,17 +44,17 @@ class PlayerDetector:
     def _scan_frame(self, frame_bgr: np.ndarray, model: LabelCNN) -> tuple | None:
         h, w = frame_bgr.shape[:2]
         y_start = int(h * 0.15)
-        y_end   = int(h * 0.70)
+        y_end = int(h * 0.70)
         cropped = frame_bgr[y_start:y_end, :]
-        ch, cw  = cropped.shape[:2]
-        half    = PATCH_SIZE // 2
+        ch, cw = cropped.shape[:2]
+        half = PATCH_SIZE // 2
         best_score = 0.0
-        best_pos   = None
+        best_pos = None
         patches, positions = [], []
 
         for y in range(half, ch - half, STRIDE):
             for x in range(half, cw - half, STRIDE):
-                patch     = cropped[y - half:y + half, x - half:x + half]
+                patch = cropped[y - half:y + half, x - half:x + half]
                 patch_rgb = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB)
                 patch_pil = transforms.functional.to_pil_image(patch_rgb)
                 patches.append(self.transform(patch_pil))
@@ -71,7 +71,7 @@ class PlayerDetector:
         for score, pos in zip(scores, positions):
             if score > best_score:
                 best_score = score
-                best_pos   = pos
+                best_pos = pos
 
         return best_pos if best_score >= CONFIDENCE_THRESHOLD else None
 
@@ -81,7 +81,7 @@ class PlayerDetector:
 
         frame_bgr = cv2.cvtColor(color_frame, cv2.COLOR_BGRA2BGR)
 
-        p1_pos  = self._scan_frame(frame_bgr, self.p1_model)
+        p1_pos = self._scan_frame(frame_bgr, self.p1_model)
         cpu_pos = self._scan_frame(frame_bgr, self.cpu_model)
 
         if p1_pos is not None:
