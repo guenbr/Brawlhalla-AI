@@ -1,6 +1,6 @@
 import cv2
 import time
-from player_api.player_detector import PlayerDetector
+from player_location.player_detector import PlayerDetector
 
 # Which monitor Brawlhalla is running on
 MONITOR = 2

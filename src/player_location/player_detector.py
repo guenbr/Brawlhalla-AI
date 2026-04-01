@@ -1,8 +1,7 @@
 import numpy as np
 import cv2
 from screen_grab.grab import ScreenGrab
-from player_api.player import Player
-from health_api.health import HealthAPI
+from player import Player
 
 PLAYER_ONE_ID = 0
 PLAYER_TWO_ID = 1
@@ -16,12 +15,9 @@ CPU_TEMPLATE_PATH = "player_api/templates/cpu_label.png"
 
 class PlayerDetector:
     def __init__(self, monitor: int, starting_lives: int = 3):
-        # Create player objects to hold each player's position and health
+        # Create player objects to hold each player's position
         self.player1 = Player(player_id=PLAYER_ONE_ID)
         self.player2 = Player(player_id=PLAYER_TWO_ID)
-
-        # Health API tracks HP and lives using pixel color sampling
-        self.health_api = HealthAPI(starting_lives=starting_lives)
 
         # Screen grabber captures frames from the specified monitor
         self.screen = ScreenGrab(monitor=monitor)
@@ -104,12 +100,6 @@ class PlayerDetector:
             self.player1.update_position(p1_pos)
         if cpu_pos is not None:
             self.player2.update_position(cpu_pos)
-
-        # Update health values from the current frame
-        health, _, _, _, _ = self.health_api.process_frame(frame_bgr)
-        if health is not None:
-            self.player1.update_health(float(health[0]))
-            self.player2.update_health(float(health[1]))
 
     def get_players(self) -> tuple[Player, Player]:
         # Return both player objects with their current state
