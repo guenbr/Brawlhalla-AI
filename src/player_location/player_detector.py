@@ -10,8 +10,8 @@ PLAYER_TWO_ID = 1
 MATCH_THRESHOLD = 0.6
 
 # File paths to the saved P1 and CPU label template images
-P1_TEMPLATE_PATH = "player_api/templates/p1_label.png"
-CPU_TEMPLATE_PATH = "player_api/templates/cpu_label.png"
+P1_TEMPLATE_PATH = "player_location/templates/p1_label.png"
+CPU_TEMPLATE_PATH = "player_location/templates/cpu_label.png"
 
 class PlayerDetector:
     def __init__(self, monitor: int, starting_lives: int = 3):
