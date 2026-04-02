@@ -5,6 +5,7 @@ import time
 class Controls:
     def __init__(self):
         self.keys = {
+            'neutral': None,
             'light': 'j',
             'heavy': 'k',
             'dodge': 'l',
@@ -22,7 +23,12 @@ class Controls:
         self.hold_duration = 0.05
 
     def press(self, action):
-        key = self.keys[action]
+        if action == 'neutral' or action is None:
+            return
+
+        key = self.keys.get(action)
+        if key is None:
+            return
 
         if action in self.hold_actions:
             pyautogui.keyDown(key)
@@ -32,13 +38,19 @@ class Controls:
             pyautogui.press(key)
 
     def hold(self, action, duration=0.1):
-        key = self.keys[action]
+        key = self.keys.get(action)
+        if key is None:
+            return
+
         pyautogui.keyDown(key)
         time.sleep(duration)
         pyautogui.keyUp(key)
 
     def release(self, action):
-        key = self.keys[action]
+        key = self.keys.get(action)
+        if key is None:
+            return
+
         pyautogui.keyUp(key)
 
     def press_multiple(self, actions):
@@ -55,28 +67,31 @@ class Controls:
             time.sleep(delay)
 
     def release_all(self):
-        for key in self.keys.values():
-            pyautogui.keyUp(key)
+        for key in set(self.keys.values()):
+            if key is not None:
+                pyautogui.keyUp(key)
+
+    def execute_action(self, action_id):
+        """Map action ID (0-7) to game action"""
+        action_map = {
+            0: 'neutral',
+            1: 'move_left',
+            2: 'move_right',
+            3: 'jump',
+            4: 'light',
+            5: 'heavy',
+            6: 'dodge',
+            7: 'throw'
+        }
+
+        action = action_map.get(action_id, 'neutral')
+        self.press(action)
 
     @staticmethod
     def reset_game():
-        time.sleep(5)
-        pyautogui.press('c')
-        time.sleep(1)
-        pyautogui.press('c')
-        time.sleep(1)
-        pyautogui.press('c')
-        time.sleep(1)
-        pyautogui.press('c')
-        time.sleep(1)
-        pyautogui.press('c')
+        time.sleep(6)
+        for _ in range(5):
+            pyautogui.press('c')
+            time.sleep(1)
         time.sleep(9)
-
-        # return True, means that we have entered a playing state
         return True
-
-# def main():
-#     test = Controls()
-#     test.reset_game()
-#
-# main()

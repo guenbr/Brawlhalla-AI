@@ -12,6 +12,10 @@ class HealthAPI:
         self.last_valid_health_p1 = 100
         self.last_valid_health_p2 = 100
 
+        self.last_death_time_p1 = 0
+        self.last_death_time_p2 = 0
+        self.death_cooldown = 2.0
+
         self.templates = {
             'game_end_p1': self.__class__.load_template('../health_api/templates/p1_death_template.png'),
             'game_end_p2': self.__class__.load_template('../health_api/templates/p2_death_template.png')
@@ -23,8 +27,8 @@ class HealthAPI:
         }
 
         self.thresholds = {
-            'game_end_p1': 0.9,
-            'game_end_p2': 0.9
+            'game_end_p1': 0.69,
+            'game_end_p2': 0.69
         }
         self.lives = np.array([starting_lives, starting_lives])
 
@@ -106,30 +110,48 @@ class HealthAPI:
         p1_dead, p1_conf = self.check_template_match('game_end_p1', frame)
         p2_dead, p2_conf = self.check_template_match('game_end_p2', frame)
 
+        current_time = time.time()
+
+        # Check if this would be a final death (game ending)
+        would_be_final_p1 = self.lives[0] == 1
+        would_be_final_p2 = self.lives[1] == 1
+
+        # Check cooldowns independently (but skip cooldown if it's final death)
+        p1_in_cooldown = (current_time - self.last_death_time_p1) < self.death_cooldown and not would_be_final_p1
+        p2_in_cooldown = (current_time - self.last_death_time_p2) < self.death_cooldown and not would_be_final_p2
+
+        # Ignore detections if in cooldown
+        if p1_in_cooldown:
+            p1_dead = False
+        if p2_in_cooldown:
+            p2_dead = False
+
         game_over = p1_dead or p2_dead
 
+        if not game_over:
+            return False, None, (p1_conf, p2_conf)
+
         winner = None
-        if p1_dead and not p2_dead:
-            winner = 'p2'
-            self.last_valid_health_p1 = 0
-            self.health[0] = 0
-            self.lives[0] -= 1
-        elif p2_dead and not p1_dead:
-            winner = 'p1'
-            self.last_valid_health_p2 = 0
-            self.health[1] = 0
-            self.lives[1] -= 1
-        elif p1_dead and p2_dead:
+        if p1_dead and p2_dead:
             winner = 'draw'
-            self.last_valid_health_p1 = 0
-            self.last_valid_health_p2 = 0
             self.health[0] = 0
             self.health[1] = 0
             self.lives[0] -= 1
             self.lives[1] -= 1
+            self.last_death_time_p1 = current_time
+            self.last_death_time_p2 = current_time
+        elif p1_dead:
+            winner = 'p2'
+            self.health[0] = 0
+            self.lives[0] -= 1
+            self.last_death_time_p1 = current_time
+        elif p2_dead:
+            winner = 'p1'
+            self.health[1] = 0
+            self.lives[1] -= 1
+            self.last_death_time_p2 = current_time
 
         return game_over, winner, (p1_conf, p2_conf)
-
     def is_game_over(self):
         if self.lives[0] == 0 or self.lives[1] == 0:
             return True
