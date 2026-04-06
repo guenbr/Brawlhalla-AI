@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 import os
-from screen_grab.grab import ScreenGrab
-from player import Player
+from src.screen_grab.grab import ScreenGrab
+from src.player import Player
 
 PLAYER_ONE_ID = 0
 PLAYER_TWO_ID = 1

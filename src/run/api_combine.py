@@ -5,7 +5,7 @@ import numpy as np
 import time
 
 
-MONITOR = 0
+MONITOR = 1
 STARTING_LIVES = 99
 
 SCREEN_GRAB = ScreenGrab(monitor=MONITOR)
@@ -13,18 +13,16 @@ HEALTH_API = HealthAPI(starting_lives=STARTING_LIVES)
 
 
 def capture_frame():
-    frames = []
-    full_frame = None
+    full_frame = SCREEN_GRAB.grab(greyscale=False)
 
-    for i in range(4):
-        full_frame = SCREEN_GRAB.grab(greyscale=False)
+    # Process the single frame for stacking
+    game_area = SCREEN_GRAB.process_greyscale(full_frame[1:1428, 70:2402])
 
-        game_area = SCREEN_GRAB.process_greyscale(full_frame[1:1428, 70:2402])
-        frames.append(game_area)
+    # Stack the same frame 4 times (or use a deque to maintain history)
+    stacked_frames = np.stack([game_area] * 4, axis=0)
 
     health_data, is_player_dead, is_game_over = get_helper_vectors(full_frame)
 
-    stacked_frames = np.stack(frames, axis=0)
     return stacked_frames, health_data, is_player_dead, is_game_over
 
 def get_helper_vectors(frame):
@@ -35,8 +33,3 @@ def get_helper_vectors(frame):
     # to form matrix
     return health_data, is_player_dead, is_game_over
 
-def main():
-    temp = Controls()
-    temp.reset_game()
-# p1 is ember, p2 is onyx
-main()
