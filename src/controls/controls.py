@@ -5,62 +5,16 @@ import time
 class Controls:
     def __init__(self):
         self.keys = {
-            'neutral': None,
-            'light': 'j',
-            'heavy': 'k',
-            'dodge': 'l',
-            'jump': 'w',
-            'move_left': 'a',
+            'neutral':    None,
+            'light':      'j',
+            'heavy':      'k',
+            'dodge':      'l',
+            'jump':       'w',
+            'move_left':  'a',
             'move_right': 'd',
-            'move_up': 'w',
-            'move_down': 's',
+            'move_up':    'w',
+            'move_down':  's',
         }
-
-    def press(self, action):
-        if action == 'neutral' or action is None:
-            return
-
-        key = self.keys.get(action)
-        if key is None:
-            return
-
-        if action in {'move_left', 'move_right', 'move_up', 'move_down'}:
-            try:
-                pyautogui.keyDown(key)
-                time.sleep(0.1)
-            finally:
-                pyautogui.keyUp(key)
-        else:
-            pyautogui.press(key)
-
-    def hold(self, action, duration=0.1):
-        key = self.keys.get(action)
-        if key is None:
-            return
-
-        pyautogui.keyDown(key)
-        time.sleep(duration)
-        pyautogui.keyUp(key)
-
-    def release(self, action):
-        key = self.keys.get(action)
-        if key is None:
-            return
-
-        pyautogui.keyUp(key)
-
-    def press_multiple(self, actions):
-        for action in actions:
-            self.press(action)
-            time.sleep(0.05)
-
-    def combo(self, actions, delays=None):
-        if delays is None:
-            delays = [0.05] * len(actions)
-
-        for action, delay in zip(actions, delays):
-            self.press(action)
-            time.sleep(delay)
 
     def release_all(self):
         for key in set(self.keys.values()):
@@ -71,19 +25,102 @@ class Controls:
                     pass
 
     def execute_action(self, action_id):
+        """
+        0  neutral
+        1  move_left
+        2  move_right
+        3  jump
+        4  light
+        5  heavy
+        6  dodge
+        7  left_heavy   — hold left, press heavy (Ssig left)
+        8  right_heavy  — hold right, press heavy (Ssig right)
+        9  left_light   — hold left, press light (side light left)
+        10 right_light  — hold right, press light (side light right)
+        """
         action_map = {
-            0: 'neutral',
-            1: 'move_left',
-            2: 'move_right',
-            3: 'jump',
-            4: 'light',
-            5: 'heavy',
-            6: 'dodge',
+            0:  'neutral',
+            1:  'move_left',
+            2:  'move_right',
+            3:  'jump',
+            4:  'light',
+            5:  'heavy',
+            6:  'dodge',
+            7:  'left_heavy',
+            8:  'right_heavy',
+            9:  'left_light',
+            10: 'right_light',
         }
 
         action = action_map.get(action_id, 'neutral')
-        self.press(action)
         print(f"Executing action: {action}")
+
+        if action == 'neutral':
+            pass
+
+        elif action == 'move_left':
+            pyautogui.keyDown('a')
+            time.sleep(0.1)
+            pyautogui.keyUp('a')
+
+        elif action == 'move_right':
+            pyautogui.keyDown('d')
+            time.sleep(0.1)
+            pyautogui.keyUp('d')
+
+        elif action == 'jump':
+            pyautogui.keyDown('w')
+            time.sleep(0.05)
+            pyautogui.keyUp('w')
+
+        elif action == 'light':
+            pyautogui.keyDown('j')
+            time.sleep(0.05)
+            pyautogui.keyUp('j')
+
+        elif action == 'heavy':
+            pyautogui.keyDown('k')
+            time.sleep(0.05)
+            pyautogui.keyUp('k')
+
+        elif action == 'dodge':
+            pyautogui.keyDown('l')
+            time.sleep(0.05)
+            pyautogui.keyUp('l')
+
+        elif action == 'left_heavy':
+            # Hold left first, then press+hold heavy while direction is held,
+            # then release both — game must see direction before attack input
+            pyautogui.keyDown('a')
+            time.sleep(0.05)        # let game register direction
+            pyautogui.keyDown('k')
+            time.sleep(0.1)         # hold long enough for Ssig to commit
+            pyautogui.keyUp('k')
+            pyautogui.keyUp('a')
+
+        elif action == 'right_heavy':
+            pyautogui.keyDown('d')
+            time.sleep(0.05)
+            pyautogui.keyDown('k')
+            time.sleep(0.1)
+            pyautogui.keyUp('k')
+            pyautogui.keyUp('d')
+
+        elif action == 'left_light':
+            pyautogui.keyDown('a')
+            time.sleep(0.05)
+            pyautogui.keyDown('j')
+            time.sleep(0.1)
+            pyautogui.keyUp('j')
+            pyautogui.keyUp('a')
+
+        elif action == 'right_light':
+            pyautogui.keyDown('d')
+            time.sleep(0.05)
+            pyautogui.keyDown('j')
+            time.sleep(0.1)
+            pyautogui.keyUp('j')
+            pyautogui.keyUp('d')
 
     @staticmethod
     def reset_game():
@@ -97,5 +134,4 @@ class Controls:
             time.sleep(1.5)
 
         time.sleep(6.5)
-
         return True

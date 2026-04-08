@@ -12,8 +12,8 @@ MATCH_THRESHOLD = 0.6
 
 # File paths relative to this file's location — works on both Mac and Windows
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-P1_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "p1_label.png")
-CPU_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "cpu_label.png")
+P1_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "Capture.PNG")
+CPU_TEMPLATE_PATH = os.path.join(BASE_DIR, "templates", "Capture_1.PNG")
 
 class PlayerDetector:
     def __init__(self, monitor: int):

@@ -16,18 +16,20 @@ class HealthAPI:
         self.death_cooldown = 2.0
 
         self.templates = {
-            'game_end_p1': self.__class__.load_template('../health_api/templates/p1_death_template.png'),
-            'game_end_p2': self.__class__.load_template('../health_api/templates/p2_death_template.png')
+            'game_end_p2': self.__class__.load_template('../health_api/templates/p1_death_template.png'),
+            'game_end_p1': self.__class__.load_template('../health_api/templates/p2_death_template.png')
         }
 
         self.regions = {
-            'game_end_p1': (2305, 50, 83, 60),
-            'game_end_p2': (2431, 50, 84, 71),
+            #'game_end_p1': (2305, 50, 83, 60),
+            'game_end_p1': (2305, 50, 84, 71),
+            #'game_end_p2': (2431, 50, 84, 71),
+            'game_end_p2': (2429, 50, 83, 58),
         }
 
         self.thresholds = {
-            'game_end_p1': 0.69,
-            'game_end_p2': 0.69
+            'game_end_p1': 0.6,
+            'game_end_p2': 0.6
         }
         self.lives = np.array([starting_lives, starting_lives])
 
