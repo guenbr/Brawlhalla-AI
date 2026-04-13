@@ -21,6 +21,7 @@ def run():
         edge_mask=True,
         starting_lives=15,
         use_cnn=False,
+        combined_data_size=14,
 
         # Logging settings
         log_every_n_steps=50,

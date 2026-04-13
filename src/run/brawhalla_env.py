@@ -13,7 +13,7 @@ from src.global_vars import MONITOR
 
 class BrawlhallaEnv:
 
-    def __init__(self, starting_lives, monitor=MONITOR, frame_skip=2):
+    def __init__(self, starting_lives, monitor=MONITOR, frame_skip=2, data_size=14):
         self.screen             = ScreenGrab(monitor=monitor)
         self.health_api         = HealthAPI(starting_lives=starting_lives)
         self.player_detector    = PlayerDetector(monitor=monitor)
@@ -25,6 +25,7 @@ class BrawlhallaEnv:
         self.recent_actions     = deque(maxlen=20)
         self.episode_start_time = None
         self.prev_combined_data = np.zeros(14, dtype=np.float32)  # flat shape
+        self.eight_val = True if data_size==8 else False
 
     def reset(self):
         if self.first_reset:
@@ -107,8 +108,10 @@ class BrawlhallaEnv:
         combined_2d  = np.concatenate([scraped_data, location_matrix], axis=1)
 
         # Flat layout (14,): [h0,l0,x0,y0, h1,l1,x1,y1, dx,dy,dist,dist_left,dist_right,on_platform]
-        combined_data = np.concatenate([combined_2d.flatten(), derived])
-
+        if self.eight_val:
+            combined_data = combined_2d.flatten()
+        else:
+            combined_data = np.concatenate([combined_2d.flatten(), derived])
         return combined_data, is_player_dead, is_game_over
 
     def step(self, action):

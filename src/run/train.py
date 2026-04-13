@@ -17,7 +17,6 @@ ACTION_NAMES = [
 ]
 
 NUM_ACTIONS = len(ACTION_NAMES)
-COMBINED_DATA_SIZE = 14
 
 
 class PPOTrainer:
@@ -41,6 +40,7 @@ class PPOTrainer:
             edge_mask=True,
             starting_lives=15,
             use_cnn=False,
+            combined_data_size=14,
 
             # Logging settings
             log_every_n_steps=50,
@@ -69,6 +69,8 @@ class PPOTrainer:
         self.edge_threshold = edge_threshold
         self.edge_mask = edge_mask
         self.use_cnn = use_cnn
+        self.combined_data_size = combined_data_size
+
         self.log_every_n_steps = log_every_n_steps
         self.checkpoint_dir = checkpoint_dir
         self.log_dir = log_dir
@@ -90,19 +92,19 @@ class PPOTrainer:
         os.makedirs(self.log_dir, exist_ok=True)
 
         # Initialize components
-        self.env = BrawlhallaEnv(starting_lives=starting_lives, monitor=MONITOR, frame_skip=frame_skip)
+        self.env = BrawlhallaEnv(starting_lives=starting_lives, monitor=MONITOR, frame_skip=frame_skip, data_size=self.combined_data_size)
         if use_cnn:
             self.model = ActorCritic(
                 num_actions=NUM_ACTIONS,
                 use_cnn=True,
                 input_channels=2,
-                combined_data_size=8
+                combined_data_size=self.combined_data_size,
             ).to(self.device)
         else:
             self.model = ActorCritic(
                 num_actions=NUM_ACTIONS,
                 use_cnn=False,
-                input_size=COMBINED_DATA_SIZE
+                input_size=self.combined_data_size,
             ).to(self.device)
 
         self.memory = PPOMemory(use_cnn=use_cnn)

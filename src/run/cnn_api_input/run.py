@@ -19,6 +19,8 @@ def run():
         edge_mask=False,
         starting_lives=5,
         use_cnn=True,
+        # add input param size
+        combined_data_size=8,
 
         log_every_n_steps=50,
         checkpoint_dir='checkpoints_9',
