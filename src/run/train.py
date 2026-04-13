@@ -1,3 +1,5 @@
+
+
 import torch
 import torch.optim as optim
 import numpy as np
@@ -20,6 +22,14 @@ NUM_ACTIONS = len(ACTION_NAMES)
 
 
 class PPOTrainer:
+    """
+    Main training loop class that combines all subclasses created and runs training
+
+    Customizable to pretty much every variable
+        - Model parameters
+        - Game state parameters
+        - Episode logging
+    """
     def __init__(
             self,
             # Training hyperparameters
@@ -91,7 +101,7 @@ class PPOTrainer:
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         os.makedirs(self.log_dir, exist_ok=True)
 
-        # Initialize components
+        # Initialize classes
         self.env = BrawlhallaEnv(starting_lives=starting_lives, monitor=MONITOR, frame_skip=frame_skip, data_size=self.combined_data_size)
         if use_cnn:
             self.model = ActorCritic(
@@ -111,7 +121,7 @@ class PPOTrainer:
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.controls = Controls()
 
-        # Training state
+        # Training state variables
         self.p1_wins = 0
         self.p2_wins = 0
         self.episode_offset = 0
@@ -119,11 +129,14 @@ class PPOTrainer:
         # Load checkpoint if exists
         self.load_checkpoint()
 
-    def load_checkpoint(self):
-        """Load checkpoint if it exists"""
+    def load_checkpoint(self) -> None:
+        """
+        Load checkpoint from previous training iteration if exists
+        """
+        # All latest paths are the most up to date for that training iteration
         checkpoint_path = f'{self.checkpoint_dir}/ppo_latest.pth'
         if os.path.exists(checkpoint_path):
-            print(f"\nLoading checkpoint: {checkpoint_path}")
+            # Load if checkpoint exists, gather metadata, and model weights
             ckpt = torch.load(checkpoint_path, map_location=self.device, weights_only=True)
             self.model.load_state_dict(ckpt['model_state_dict'])
 
@@ -133,33 +146,40 @@ class PPOTrainer:
             self.p1_wins = ckpt.get('p1_wins', 0)
             self.p2_wins = ckpt.get('p2_wins', 0)
             self.episode_offset = ckpt.get('episode', 0)
-            print(f"Resumed from episode {self.episode_offset} | "
-                  f"P1 wins: {self.p1_wins} | P2 wins: {self.p2_wins}\n")
-        else:
-            print("Starting fresh\n")
 
-    def apply_edge_mask(self, action_probs, combined_data):
-        """Apply edge masking to action probabilities"""
+    def apply_edge_mask(self, action_probs: torch.Tensor, combined_data: torch.Tensor) -> torch.Tensor:
+        """
+        Apply edge masking to action probabilities
+
+        Args:
+            action_probs (torch.Tensor): action probabilities for each action
+            combined_data (torch.Tensor): data sourced from API's about game state
+        Returns:
+            action_probs (torch.Tensor): unmasked/masked tensor of action probabilties
+        """
         if not self.edge_mask:
             return action_probs
 
         dist_left = combined_data[11]
         dist_right = combined_data[12]
 
+        # Init a mask
         mask = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
+        # If too close to right, mask actions that cause agent to move further right
         if dist_right < self.edge_threshold:
-            mask[2] = 0  # move_right
-            mask[5] = 0  # heavy
-            mask[8] = 0  # right_heavy
-            mask[10] = 0  # right_light
-
+            mask[2] = 0
+            mask[5] = 0
+            mask[8] = 0
+            mask[10] = 0
+        # If too close to left, mask actions that cause agent to move further left
         if dist_left < self.edge_threshold:
-            mask[1] = 0  # move_left
-            mask[5] = 0  # heavy
-            mask[7] = 0  # left_heavy
-            mask[9] = 0  # left_light
+            mask[1] = 0
+            mask[5] = 0
+            mask[7] = 0
+            mask[9] = 0
 
+        # Apply mask to action distrub
         mask_t = torch.FloatTensor(mask).to(self.device)
         action_probs = action_probs * mask_t
         action_probs = action_probs + 1e-6
@@ -179,13 +199,13 @@ class PPOTrainer:
 
         # Common forward pass and action selection
         with torch.no_grad():
-            # Forward pass (conditional on inputs)
+            # Forward pass, conditional on inputs
             if self.use_cnn:
                 action_probs, value = self.model(s_t, cd_t)
             else:
                 action_probs, value = self.model(cd_t)
 
-            # Process probabilities (same for both modes)
+            # Process probabilities, same for both modes
             action_probs = torch.clamp(action_probs, min=1e-6, max=1.0)
             action_probs = action_probs / action_probs.sum(dim=-1, keepdim=True)
 
@@ -198,8 +218,15 @@ class PPOTrainer:
 
         return action.item(), log_prob.item(), value.item(), action_probs.cpu().numpy()[0]
 
-    def log_step(self, episode_steps, action_probs, value):
-        """Log step information"""
+    def log_step(self, episode_steps: int, action_probs: torch.Tensor, value: float) -> None:
+        """
+        Log step information for training purposes
+
+        Args:
+            episode_steps (int): number of steps taken in current episode
+            action_probs (torch.Tensor): torch tensor of action probabilities
+            value (float): current entropy value
+        """
         probs_np = action_probs.cpu().numpy()[0]
         ent_now = -np.sum(probs_np * np.log(probs_np + 1e-8))
         max_prob = probs_np.max()
@@ -207,29 +234,34 @@ class PPOTrainer:
         print(f"  [step {episode_steps}] probs: {np.round(probs_np, 3)} | "
               f"V={value:.2f} | ent={ent_now:.3f} | max_p={max_prob:.3f}")
 
-        if ent_now < self.entropy_warning:
-            print(f"  !! ENTROPY WARNING: {ent_now:.4f} — policy collapsing")
-        if max_prob > self.max_prob_spam:
-            print(f"  !! SPAM WARNING: one action at {max_prob:.1%}")
 
     def print_episode_summary(self, global_episode, episode_reward, episode_steps,
-                              deaths_this_ep, info, action_counts):
-        """Print episode summary"""
-        print(f"\n  Action counts this episode:")
-        for name, count in zip(ACTION_NAMES, action_counts):
-            pct = 100 * count / max(episode_steps, 1)
-            flag = " <-- SPAM" if pct > self.action_spam_pct else ""
-            print(f"    {name:<12} {count:>5}  ({pct:.1f}%){flag}")
+                              deaths_this_ep, info):
+        """
+        Print episode summary used for training purposes
 
-        print(f"\n{'=' * 70}")
+        Args:
+            global_episode (int): episode number in training loop
+            episode_reward (float): current episode reward
+            episode_steps (int): number of steps taken in current episode
+            deaths_this_ep (int): deaths in current episode
+            info (dict): meta info of game state
+        """
         print(f"EPISODE {global_episode} COMPLETE")
         print(f"Reward: {episode_reward:.2f} | Steps: {episode_steps} | Deaths: {deaths_this_ep}")
         print(f"Final: P1={int(info['lives'][0])} lives, P2={int(info['lives'][1])} lives")
         print(f"Win Rate: P1={self.p1_wins}/{global_episode} "
               f"({100 * self.p1_wins / global_episode:.1f}%)")
 
-    def update_model(self):
-        """Run PPO update"""
+    def update_model(self) -> tuple[float, float]:
+        """
+        Run PPO update
+
+        Returns:
+            tuple containing:
+                - loss_val (float): critic loss value
+                - ent_val (float): entropy at current state
+        """
         print(f"\nTraining on {len(self.memory.combined_data)} experiences...")
         loss_val, ent_val = _run_ppo_update(
             self.model, self.optimizer, self.memory, self.device,
@@ -238,15 +270,15 @@ class PPOTrainer:
         )
         print(f"Loss: {loss_val:.4f} | Entropy: {ent_val:.4f}")
 
-        if ent_val < self.entropy_warning:
-            print("!! Entropy collapsed — check reward scale / lr")
-        elif ent_val > self.entropy_random:
-            print("!! Entropy still near-random — policy not converging")
-
         return loss_val, ent_val
 
-    def save_checkpoint(self, global_episode):
-        """Save model checkpoint"""
+    def save_checkpoint(self, global_episode: int) -> None:
+        """
+        Save model weights and metadata
+
+        Args:
+            global_episode (int): number of total episodes in training iteration
+        """
         ckpt_path = f'{self.checkpoint_dir}/ppo_ep{global_episode}.pth'
         for path in [ckpt_path, f'{self.checkpoint_dir}/ppo_latest.pth']:
             torch.save({
@@ -258,9 +290,23 @@ class PPOTrainer:
             }, path)
         print(f"Checkpoint saved: {ckpt_path}")
 
-    def log_to_csv(self, global_episode, episode_reward, episode_steps, deaths_this_ep,
-                   info, action_counts, final_probs, loss_val, ent_val):
-        """Log episode data to CSV"""
+    def log_to_csv(self, global_episode: int, episode_reward: float, episode_steps: int, deaths_this_ep: int,
+                   info: dict, action_counts: list[int], final_probs: np.ndarray | None, loss_val: float,
+                   ent_val: float) -> None:
+        """
+        Log episode data to CSV
+
+        Args:
+            global_episode (int): number of total episodes in training iteration
+            episode_reward (float): current episode reward
+            episode_steps (int): number of steps taken in current episode
+            deaths_this_ep (int): number of deaths in current episode
+            info (dict): meta info of game state
+            action_counts (list[int]): count of each action taken
+            final_probs (np.ndarray | None): final action probabilities or None
+            loss_val (float): training loss value
+            ent_val (float): entropy value
+        """
         ep_csv = f'{self.log_dir}/episodes.csv'
         write_hdr = not os.path.exists(ep_csv) or os.path.getsize(ep_csv) == 0
 
@@ -268,6 +314,7 @@ class PPOTrainer:
             if write_hdr:
                 count_header = ','.join(f'count_{n}' for n in ACTION_NAMES)
                 prob_header = ','.join(f'prob_{n}' for n in ACTION_NAMES)
+                # Save all metadata needed for analyzing model performance, and plotting
                 f.write(
                     'timestamp,episode,reward,entropy,loss,steps,deaths,'
                     'p1_lives,p2_lives,p1_wins,p2_wins,'
@@ -293,8 +340,20 @@ class PPOTrainer:
                 f'{counts_str},{probs_str}\n'
             )
 
-    def run_episode(self):
-        """Run a single episode"""
+    def run_episode(self) -> tuple[float, int, int, dict, list[int], np.ndarray | None]:
+        """
+        Run a single episode
+
+        Returns:
+            tuple containing:
+                - episode_reward (float): total reward for the episode
+                - episode_steps (int): number of steps taken
+                - deaths_this_ep (int): number of deaths in episode
+                - info (dict): game state metadata
+                - action_counts (list[int]): count of each action taken
+                - final_probs (np.ndarray | None): final action probabilities or None
+        """
+        # Re init environment
         combined_data = self.env.reset()
         episode_reward = 0
         episode_steps = 0
@@ -303,10 +362,11 @@ class PPOTrainer:
         final_probs = None
 
         while True:
+            # Selection action
             action, log_prob, value, probs = self.select_action(combined_data)
             action_counts[action] += 1
             final_probs = probs
-
+            # Execute action, and save in memory for training
             next_cd, reward, done, info = self.env.step(action)
             self.memory.store(combined_data, action, reward, value, log_prob, done)
 
@@ -314,6 +374,7 @@ class PPOTrainer:
             episode_reward += reward
             episode_steps += 1
 
+            # Process metadata
             if info['is_player_dead']:
                 deaths_this_ep += 1
 
@@ -321,9 +382,8 @@ class PPOTrainer:
                 self.log_step(episode_steps, torch.FloatTensor(probs), value)
 
             if episode_steps > self.max_steps:
-                print("\nEpisode timeout")
                 done = True
-
+            # Check game over
             if done:
                 self.controls.release_all()
                 if info['lives'][0] > info['lives'][1]:
@@ -334,8 +394,10 @@ class PPOTrainer:
 
         return episode_reward, episode_steps, deaths_this_ep, info, action_counts, final_probs
 
-    def train(self):
-        """Main training loop"""
+    def train(self) -> None:
+        """
+        Main training loop
+        """
         episode_batch = 0
         loss_val = 0.0
         ent_val = 0.0
@@ -348,7 +410,7 @@ class PPOTrainer:
                 self.run_episode()
 
             self.print_episode_summary(global_episode, episode_reward, episode_steps,
-                                       deaths_this_ep, info, action_counts)
+                                       deaths_this_ep, info)
 
             episode_batch += 1
 
@@ -366,19 +428,3 @@ class PPOTrainer:
                             info, action_counts, final_probs, loss_val, ent_val)
 
 
-if __name__ == "__main__":
-    # Default run
-    trainer = PPOTrainer()
-    trainer.train()
-
-    # Or customize:
-    # trainer = PPOTrainer(learning_rate=0.0003, entropy_coef=0.01, num_episodes=1000)
-    # trainer.train()
-
-    # Or run multiple experiments:
-    # trainer = PPOTrainer(
-    #     learning_rate=0.0005,
-    #     checkpoint_dir='checkpoints_fast',
-    #     log_dir='logs_fast'
-    # )
-    # trainer.train()
