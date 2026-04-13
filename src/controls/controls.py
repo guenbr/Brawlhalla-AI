@@ -3,20 +3,38 @@ import time
 
 
 class Controls:
+    """
+    Handles all the keyboard input sent to the Brawlhalla game window
+
+    Simulates key presses using pyautogui to control the game based on the actions determined by the agent.
+
+    Movement actions (left, right, up, down) are held for a short duration to simulate continuous movement,
+    while attack and dodge actions are pressed briefly.
+    """
+
     def __init__(self):
+        """
+        Sets up the keybind mapping for all in-game actions. The keys can be customized to match
+        the player's preferred controls.
+        """
+
+        # Mapping of actions to their corresponding key presses
         self.keys = {
-            'neutral':    None,
-            'light':      'j',
-            'heavy':      'k',
-            'dodge':      'l',
-            'jump':       'w',
-            'move_left':  'a',
+            'neutral': None,
+            'light': 'j',
+            'heavy': 'k',
+            'dodge': 'l',
+            'jump': 'w',
+            'move_left': 'a',
             'move_right': 'd',
-            'move_up':    'w',
-            'move_down':  's',
+            'move_up': 'w',
+            'move_down': 's',
         }
 
     def release_all(self):
+        """
+        Releases all keys
+        """
         for key in set(self.keys.values()):
             if key is not None:
                 try:
@@ -26,18 +44,16 @@ class Controls:
 
     def execute_action(self, action_id):
         """
-        0  neutral
-        1  move_left
-        2  move_right
-        3  jump
-        4  light
-        5  heavy
-        6  dodge
-        7  left_heavy   — hold left, press heavy (Ssig left)
-        8  right_heavy  — hold right, press heavy (Ssig right)
-        9  left_light   — hold left, press light (side light left)
-        10 right_light  — hold right, press light (side light right)
+        Converts an action ID from the agent into a corresponding key press and executes it.
+
+        This is what connects the agent's output to the actual key presses that control the game.
+
+        Args:
+            action_id: An integer representing the action chosen by the agent (e.g., 0 for 'neutral',
+                       1 for 'move_left', etc.). The mapping of action IDs to action names is defined
+                       in the action_map dictionary within this method.
         """
+        # Mapping of action IDs to their corresponding action names
         action_map = {
             0:  'neutral',
             1:  'move_left',
@@ -124,8 +140,15 @@ class Controls:
 
     @staticmethod
     def reset_game():
+        """
+        Resets the game by pressing the 'c' key multiple times with specific delays to navigate
+        through the game's menus and start a new match
+        """
+
+        # The initial delay allows the player to switch to the game window
         time.sleep(4)
 
+        # Pressing 'c' multiple times with some delays to navigate through the menu and start a new match
         for i in range(5):
             pyautogui.keyDown('c')
             time.sleep(0.2)
@@ -133,5 +156,7 @@ class Controls:
             print('pressed c')
             time.sleep(1.5)
 
+        # Final delay to make sure that the match has started before the agent begins taking the actions
         time.sleep(6.5)
+
         return True
