@@ -19,7 +19,7 @@ Brawlhalla is a free-to-play platform fighter similar to Super Smash Bros. Playe
 
 ## 🎥 Presentation
 
-- [Presentation Video]([https://www.example.com](https://drive.google.com/file/d/1EDIkbhnhX2mcYtsJLOkp9HlfbWn-ojaj/view?usp=sharing))
+- [Presentation Video](https://drive.google.com/file/d/1EDIkbhnhX2mcYtsJLOkp9HlfbWn-ojaj/view?usp=sharing)
 
 --- 
 
