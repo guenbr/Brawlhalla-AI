@@ -6,12 +6,11 @@ from collections import deque
 from src.screen_grab.grab import ScreenGrab
 from src.health_api.health import HealthAPI
 from src.controls.controls import Controls
-import cv2
 import time
 import os
 from src.player_location.player_detector import PlayerDetector
 
-STARTING_LIVES = 5
+STARTING_LIVES = 15
 
 ACTION_NAMES = [
     'neutral',
@@ -43,49 +42,40 @@ TARGET_ACTION_DIST = torch.tensor([
     0.07,   # right_light
 ], dtype=torch.float32)
 
+# flat layout: [h0, l0, x0, y0, h1, l1, x1, y1, dx, dy, dist, dist_left, dist_right, on_platform]
+# 8 (scraped+location) + 6 (derived) = 14
+COMBINED_DATA_SIZE = 14
+
 
 class ActorCritic(nn.Module):
-    def __init__(self, input_channels=2, num_actions=NUM_ACTIONS):
+    def __init__(self, input_size=COMBINED_DATA_SIZE, num_actions=NUM_ACTIONS):
         super(ActorCritic, self).__init__()
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(input_channels, 32, kernel_size=8, stride=4),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1),
-            nn.ReLU()
-        )
-
-        conv_out_size = self._get_conv_out((input_channels, 90, 160))
-
         self.actor = nn.Sequential(
-            nn.Linear(conv_out_size + 8, 512),
+            nn.Linear(input_size, 64),
             nn.ReLU(),
-            nn.Linear(512, num_actions),
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_actions),
             nn.Softmax(dim=-1)
         )
 
         self.critic = nn.Sequential(
-            nn.Linear(conv_out_size + 8, 512),
+            nn.Linear(input_size, 64),
             nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.Linear(64, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1)
         )
 
-    def _get_conv_out(self, shape):
-        o = self.conv(torch.zeros(1, *shape))
-        return int(np.prod(o.size()))
-
-    def forward(self, frames, combined_data):
-        conv_out = self.conv(frames).view(frames.size()[0], -1)
-        data_flat = combined_data.reshape(combined_data.size()[0], -1)
-        combined = torch.cat([conv_out, data_flat], dim=1)
-        return self.actor(combined), self.critic(combined)
+    def forward(self, combined_data):
+        # Input is already flat (batch, 14) — no reshape needed
+        x = combined_data
+        return self.actor(x), self.critic(x)
 
 
 class PPOMemory:
     def __init__(self):
-        self.states        = []
         self.combined_data = []
         self.actions       = []
         self.rewards       = []
@@ -93,8 +83,7 @@ class PPOMemory:
         self.log_probs     = []
         self.dones         = []
 
-    def store(self, state, combined_data, action, reward, value, log_prob, done):
-        self.states.append(state)
+    def store(self, combined_data, action, reward, value, log_prob, done):
         self.combined_data.append(combined_data)
         self.actions.append(action)
         self.rewards.append(reward)
@@ -103,12 +92,11 @@ class PPOMemory:
         self.dones.append(done)
 
     def clear(self):
-        self.states = []; self.combined_data = []; self.actions = []
+        self.combined_data = []; self.actions = []
         self.rewards = []; self.values = []; self.log_probs = []; self.dones = []
 
     def get_batches(self):
-        return (np.array(self.states),
-                np.array(self.combined_data),
+        return (np.array(self.combined_data),
                 np.array(self.actions),
                 np.array(self.rewards),
                 np.array(self.values),
@@ -128,11 +116,7 @@ class BrawlhallaEnv:
         self.first_reset        = True
         self.recent_actions     = deque(maxlen=20)
         self.episode_start_time = None
-        self.prev_combined_data = np.zeros((2, 4), dtype=np.float32)
-
-        self._reward_mean = 0.0
-        self._reward_var  = 1.0
-        self._reward_n    = 0
+        self.prev_combined_data = np.zeros(14, dtype=np.float32)  # flat shape
 
     def reset(self):
         if self.first_reset:
@@ -151,48 +135,70 @@ class BrawlhallaEnv:
         self.prev_health        = np.array([100.0, 100.0])
         self.recent_actions.clear()
         self.episode_start_time = time.time()
-        stacked_frames, combined_data, _, _ = self.capture_frame()
+        combined_data, _, _ = self.capture_frame()
         self.prev_combined_data = combined_data.copy()
-        return stacked_frames, combined_data
+
+        self.reward_components = {
+            'damage_dealt': 0.0,
+            'damage_taken': 0.0,
+            'time_penalty': 0.0,
+            'offstage_penalty': 0.0,
+            'suicide_penalty': 0.0,
+            'death_penalty': 0.0,
+            'kill_reward': 0.0,
+        }
+
+        return combined_data
 
     def capture_frame(self):
-        frames = []
-        full_frame = None
-        for _ in range(2):
-            full_frame = self.screen.grab(greyscale=False)
-            game_area  = full_frame[1:1428, 70:2402]
-            gray       = cv2.cvtColor(game_area, cv2.COLOR_BGR2GRAY)
-            resized    = cv2.resize(gray, (160, 90))
-            frames.append(resized / 255.0)
+        full_frame = self.screen.grab(greyscale=False)
 
         health_vector, is_player_dead, winner, lives, is_game_over = \
             self.health_api.process_frame(full_frame)
         location_matrix = self.player_detector.get_positions(full_frame)
 
         normalized_health = health_vector / 100.0
-        normalized_lives  = lives / float(self.starting_lives)
+        normalized_lives = lives / float(self.starting_lives)
 
         location_matrix = np.array(location_matrix, dtype=np.float32)
-        location_matrix[:, 0] = (location_matrix[:, 0] - 70)  / (2402 - 70)
-        location_matrix[:, 1] = (location_matrix[:, 1] - 1)   / (1428 - 1)
+        location_matrix[:, 0] = location_matrix[:, 0] / 2560.0
+        location_matrix[:, 1] = location_matrix[:, 1] / 1440.0
         location_matrix = np.clip(location_matrix, 0, 1)
 
         if (lives[0] <= 0 or lives[1] <= 0) and not is_game_over:
             print("Forcing game over (a player's lives reached 0)")
             is_game_over = True
 
-        scraped_data   = np.stack([normalized_health, normalized_lives], axis=0).T
-        combined_data  = np.concatenate([scraped_data, location_matrix], axis=1)
-        stacked_frames = np.stack(frames, axis=0)
-        return stacked_frames, combined_data, is_player_dead, is_game_over
+        PLATFORM_LEFT  = 0.319
+        PLATFORM_RIGHT = 0.678
+        PLATFORM_Y     = 0.581
 
-    def _normalise_reward(self, r):
-        self._reward_n   += 1
-        delta             = r - self._reward_mean
-        self._reward_mean += delta / self._reward_n
-        self._reward_var  += delta * (r - self._reward_mean)
-        std = max(np.sqrt(self._reward_var / max(self._reward_n, 1)), 1.0)
-        return np.clip(r / std, -10.0, 10.0)
+        p1_x, p1_y = location_matrix[0, 0], location_matrix[0, 1]
+        p2_x, p2_y = location_matrix[1, 0], location_matrix[1, 1]
+
+        dx = p2_x - p1_x
+        dy = p2_y - p1_y
+        dist_to_opponent = np.sqrt(dx ** 2 + dy ** 2)
+        dist_left_edge   = p1_x - PLATFORM_LEFT
+        dist_right_edge  = PLATFORM_RIGHT - p1_x
+        on_platform      = float((dist_left_edge > 0) and (dist_right_edge > 0) and (p1_y <= PLATFORM_Y))
+
+        derived = np.array([
+            dx, dy,
+            dist_to_opponent,
+            dist_left_edge,
+            dist_right_edge,
+            on_platform,
+        ], dtype=np.float32)
+
+        scraped_data = np.stack([normalized_health, normalized_lives], axis=0).T
+        # 2D combined for reference (2, 4): [health, lives, x, y] per player
+        combined_2d  = np.concatenate([scraped_data, location_matrix], axis=1)
+
+        # Flat layout (14,): [h0,l0,x0,y0, h1,l1,x1,y1, dx,dy,dist,dist_left,dist_right,on_platform]
+        combined_data = np.concatenate([combined_2d.flatten(), derived])
+
+        return combined_data, is_player_dead, is_game_over
 
     def step(self, action):
         total_reward = 0
@@ -201,11 +207,11 @@ class BrawlhallaEnv:
             self.controls.execute_action(action)
             time.sleep(0.0089)
 
-        stacked_frames, combined_data, is_player_dead, is_game_over = \
-            self.capture_frame()
+        combined_data, is_player_dead, is_game_over = self.capture_frame()
 
-        health = combined_data[:, 0] * 100.0
-        lives  = combined_data[:, 1] * float(self.starting_lives)
+        # flat indices: h0=0, l0=1, x0=2, y0=3, h1=4, l1=5, x1=6, y1=7
+        health = combined_data[[0, 4]] * 100.0
+        lives  = combined_data[[1, 5]] * float(self.starting_lives)
 
         total_reward += self.calculate_reward(health, lives, is_player_dead,
                                               is_game_over, combined_data, action)
@@ -247,11 +253,9 @@ class BrawlhallaEnv:
         else:
             self.prev_health = health.copy()
 
-        total_reward = self._normalise_reward(total_reward)
-
         info = {'health': health, 'lives': lives,
                 'winner': None, 'is_player_dead': is_player_dead}
-        return stacked_frames, combined_data, total_reward, is_game_over, info
+        return combined_data, total_reward, is_game_over, info
 
     def calculate_reward(self, health, lives, is_player_dead, is_game_over, combined_data, action):
         reward = 0
@@ -260,68 +264,36 @@ class BrawlhallaEnv:
         damage_dealt = abs(health_diff[1]) if health_diff[1] < 0 else 0
         damage_taken = abs(health_diff[0]) if health_diff[0] < 0 else 0
 
-        p1_x = combined_data[0, 2]
-        p2_x = combined_data[1, 2]
-        dist  = abs(p1_x - p2_x)
-        on_platform = 0.28 < p1_x < 0.80
+        # flat indices: x0=2, y0=3
+        p1_x = combined_data[2]
+        p1_y = combined_data[3]
+        on_platform = (0.319 < p1_x < 0.678) and (p1_y <= 0.581)
 
-        # ── 1. CLOSING DISTANCE — highest, platform only ──────────────
-        prev_dist = abs(self.prev_combined_data[0, 2] - self.prev_combined_data[1, 2])
-        closing   = prev_dist - dist
-        if on_platform:
-            reward += closing * 6.0
+        offstage_pen = -.6 if not on_platform else 0.0
+        dealt_r = damage_dealt * 0.05
+        taken_r = -(damage_taken * 0.025)
 
-        # ── 2. DAMAGE ─────────────────────────────────────────────────
-        proximity_bonus = max(1.0, 2.0 - dist * 4.0)
-        reward += damage_dealt * 3.0 * proximity_bonus
-        reward -= damage_taken * 1.2
+        reward += offstage_pen + dealt_r + taken_r
 
-        # ── 3. PLATFORM ───────────────────────────────────────────────
-        if on_platform:
-            reward += 0.4
-        else:
-            reward -= 0.8
+        self.reward_components['offstage_penalty'] += offstage_pen
+        self.reward_components['damage_dealt']     += dealt_r
+        self.reward_components['damage_taken']     += taken_r
 
-        # ── 4. DEATH OUTCOMES ─────────────────────────────────────────
         if is_player_dead:
+            print(f'  P1 death | damage_taken={damage_taken:.1f}')
             if damage_taken > 50:
-                reward -= 50
+                reward -= 10
+                self.reward_components['suicide_penalty'] -= 10
+                print('suicide reward')
             if health[0] <= 1:
-                reward -= 20
-                print(f"  P1 DIED | Lives: {int(lives[0])}")
+                reward -= 3
+                self.reward_components['death_penalty'] -= 3
             if health[1] <= 1:
-                reward += 35
-                print(f"  P1 GOT A KILL | Opponent lives: {int(lives[1])}")
+                reward += 40
+                self.reward_components['kill_reward'] += 10
+                print('kill reward')
 
-        if is_game_over:
-            p1, p2 = int(lives[0]), int(lives[1])
-            if p1 > p2:
-                reward += 80 + (p1 - p2) * 8
-                print(f"  EPISODE WIN  | P1: {p1} P2: {p2}")
-            elif p2 > p1:
-                reward -= 40
-                print(f"  EPISODE LOSS | P1: {p1} P2: {p2}")
-            else:
-                print(f"  EPISODE DRAW | Both: {p1}")
-
-        # ── 5. ACTION DIVERSITY ───────────────────────────────────────
-        self.recent_actions.append(action)
-        if len(self.recent_actions) >= 10:
-            unique = len(set(list(self.recent_actions)[-10:]))
-            reward -= max(0, (3 - unique)) * 1.2
-            if unique >= 4:
-                reward += 0.4
-
-        # ── 6. STILLNESS ──────────────────────────────────────────────
-        p1_dx = abs(p1_x - self.prev_combined_data[0, 2])
-        if p1_dx < 0.002:
-            reward -= 0.15
-        elif p1_dx > 0.005:
-            reward += 0.10
-
-        # ── STORE STATE ───────────────────────────────────────────────
         self.prev_combined_data = combined_data.copy()
-
         return reward
 
 
@@ -343,11 +315,11 @@ def train_ppo():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
     print("=" * 70)
 
-    os.makedirs('checkpoints_11', exist_ok=True)
-    os.makedirs('logs_11', exist_ok=True)
+    os.makedirs('checkpoints_14', exist_ok=True)
+    os.makedirs('logs_14', exist_ok=True)
 
     env       = BrawlhallaEnv(monitor=1, frame_skip=2, starting_lives=STARTING_LIVES)
-    model     = ActorCritic(input_channels=2, num_actions=NUM_ACTIONS).to(device)
+    model     = ActorCritic(input_size=COMBINED_DATA_SIZE, num_actions=NUM_ACTIONS).to(device)
     optimizer = optim.Adam(model.parameters(), lr=0.00015)
     controls  = Controls()
     memory    = PPOMemory()
@@ -356,13 +328,12 @@ def train_ppo():
     p2_wins        = 0
     episode_offset = 0
 
-    # ── no checkpoint carry-over — action space changed, start fresh ──
-    checkpoint_path = 'checkpoints_11/ppo_latest.pth'
+    checkpoint_path = 'checkpoints_14/ppo_latest.pth'
     if os.path.exists(checkpoint_path):
         print(f"\nLoading checkpoint: {checkpoint_path}")
         ckpt = torch.load(checkpoint_path, map_location=device, weights_only=True)
         model.load_state_dict(ckpt['model_state_dict'])
-        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+       # optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         for group in optimizer.param_groups:
             group['lr'] = 0.00015
         p1_wins        = ckpt.get('p1_wins', 0)
@@ -371,16 +342,15 @@ def train_ppo():
         print(f"Resumed from episode {episode_offset} | "
               f"P1 wins: {p1_wins} | P2 wins: {p2_wins}\n")
     else:
-        print("Starting fresh (new action space)\n")
+        print("Starting fresh\n")
 
-    # ── hyperparameters ───────────────────────────────────────────────
-    gamma               = 0.995
+    gamma               = 0.965
     lam                 = 0.95
-    epsilon             = 0.10
+    epsilon             = 0.20
     epochs_per_update   = 4
-    entropy_coef        = 0.01
-    diversity_coef      = 0.03
-    episodes_per_update = 8
+    entropy_coef        = 0.003
+    diversity_coef      = 0.0
+    episodes_per_update = 4
     num_episodes        = 500
 
     episode_batch = 0
@@ -390,7 +360,7 @@ def train_ppo():
     for episode in range(num_episodes):
         global_episode = episode_offset + episode + 1
 
-        state, combined_data = env.reset()
+        combined_data = env.reset()
         episode_reward = 0
         episode_steps  = 0
         deaths_this_ep = 0
@@ -403,27 +373,50 @@ def train_ppo():
         print(f"{'='*70}")
 
         while True:
-            s_t  = torch.FloatTensor(state).unsqueeze(0).to(device)
             cd_t = torch.FloatTensor(combined_data).unsqueeze(0).to(device)
 
             with torch.no_grad():
-                action_probs, value = model(s_t, cd_t)
+                action_probs, value = model(cd_t)
                 action_probs = torch.clamp(action_probs, min=1e-6, max=1.0)
                 action_probs = action_probs / action_probs.sum(dim=-1, keepdim=True)
 
-                dist     = torch.distributions.Categorical(action_probs)
-                action   = dist.sample()
+                # --- edge action masking ---
+                dist_left = combined_data[11]
+                dist_right = combined_data[12]
+                EDGE_THRESHOLD = 0.15
+
+                mask = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+                #       neutral, left, right, jump, light, heavy, dodge, l_heavy, r_heavy, l_light, r_light
+
+                if dist_right < EDGE_THRESHOLD:
+                    mask[2] = 0  # move_right
+                    mask[5] = 0  # heavy
+                    mask[8] = 0  # right_heavy
+                    mask[10] = 0  # right_light
+
+                if dist_left < EDGE_THRESHOLD:
+                    mask[1] = 0  # move_left
+                    mask[5] = 0  # heavy
+                    mask[7] = 0  # left_heavyl
+                    mask[9] = 0  # left_light
+
+                mask_t = torch.FloatTensor(mask).to(device)
+                action_probs = action_probs * mask_t
+                action_probs = action_probs + 1e-6  # ensure no zeros after masking
+                action_probs = action_probs / action_probs.sum(dim=-1, keepdim=True)
+
+                dist = torch.distributions.Categorical(action_probs)
+                action = dist.sample()
                 log_prob = dist.log_prob(action)
 
             action_counts[action.item()] += 1
             final_probs = action_probs.cpu().numpy()[0]
 
-            next_state, next_cd, reward, done, info = env.step(action.item())
-            memory.store(state, combined_data, action.item(), reward,
+            next_cd, reward, done, info = env.step(action.item())
+            memory.store(combined_data, action.item(), reward,
                          value.item(), log_prob.item(), done)
 
-            state         = next_state
-            combined_data = next_cd
+            combined_data  = next_cd
             episode_reward += reward
             episode_steps  += 1
 
@@ -472,8 +465,8 @@ def train_ppo():
         episode_batch += 1
 
         if episode_batch >= episodes_per_update:
-            if len(memory.states) > 0:
-                print(f"\nTraining on {len(memory.states)} experiences "
+            if len(memory.combined_data) > 0:
+                print(f"\nTraining on {len(memory.combined_data)} experiences "
                       f"({episode_batch} episodes)...")
                 loss_val, ent_val = _run_ppo_update(
                     model, optimizer, memory, device,
@@ -490,55 +483,51 @@ def train_ppo():
                 memory.clear()
             episode_batch = 0
 
-            ckpt_path = f'checkpoints_11/ppo_ep{global_episode}.pth'
-            torch.save({
-                'episode':              global_episode,
-                'model_state_dict':     model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'p1_wins':              p1_wins,
-                'p2_wins':              p2_wins,
-            }, ckpt_path)
-            # also keep a rolling latest so resuming is always easy
-            torch.save({
-                'episode':              global_episode,
-                'model_state_dict':     model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'p1_wins':              p1_wins,
-                'p2_wins':              p2_wins,
-            }, 'checkpoints_11/ppo_latest.pth')
+            ckpt_path = f'checkpoints_14/ppo_ep{global_episode}.pth'
+            for path in [ckpt_path, 'checkpoints_14/ppo_latest.pth']:
+                torch.save({
+                    'episode':              global_episode,
+                    'model_state_dict':     model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'p1_wins':              p1_wins,
+                    'p2_wins':              p2_wins,
+                }, path)
             print(f"Checkpoint saved: {ckpt_path}")
 
-        # ── csv log every episode ─────────────────────────────────────
-        csv_path  = 'logs_11/training_metrics.csv'
-        write_hdr = not os.path.exists(csv_path) or \
-                    os.path.getsize(csv_path) == 0
-        with open(csv_path, 'a') as f:
+        ep_csv = 'logs_14/episodes.csv'
+        write_hdr = not os.path.exists(ep_csv) or os.path.getsize(ep_csv) == 0
+        with open(ep_csv, 'a') as f:
             if write_hdr:
                 count_header = ','.join(f'count_{n}' for n in ACTION_NAMES)
-                prob_header  = ','.join(f'prob_{n}'  for n in ACTION_NAMES)
+                prob_header  = ','.join(f'prob_{n}' for n in ACTION_NAMES)
                 f.write(
-                    'timestamp,episode,deaths,reward,steps,'
-                    'p1_lives,p2_lives,p1_wins,p2_wins,entropy,'
+                    'timestamp,episode,reward,entropy,loss,steps,deaths,'
+                    'p1_lives,p2_lives,p1_wins,p2_wins,'
+                    'r_damage_dealt,r_damage_taken,r_time_penalty,'
+                    'r_offstage_penalty,r_suicide_penalty,r_death_penalty,r_kill_reward,'
                     f'{count_header},{prob_header}\n'
                 )
 
+            rc = env.reward_components
             counts_str = ','.join(str(c) for c in action_counts)
             probs_str  = ','.join(f'{p:.4f}' for p in final_probs) \
-                         if final_probs is not None else ','.join(['0.0000'] * NUM_ACTIONS)
+                if final_probs is not None else ','.join(['0.0000'] * NUM_ACTIONS)
 
             f.write(
                 f'{time.strftime("%Y-%m-%d %H:%M:%S")},'
-                f'{global_episode},{deaths_this_ep},{episode_reward:.2f},'
-                f'{episode_steps},{int(info["lives"][0])},'
-                f'{int(info["lives"][1])},{p1_wins},{p2_wins},'
-                f'{ent_val:.4f},{counts_str},{probs_str}\n'
+                f'{global_episode},{episode_reward:.2f},{ent_val:.6f},{loss_val:.6f},{episode_steps},{deaths_this_ep},'
+                f'{int(info["lives"][0])},{int(info["lives"][1])},'
+                f'{p1_wins},{p2_wins},'
+                f'{rc["damage_dealt"]:.2f},{rc["damage_taken"]:.2f},{rc["time_penalty"]:.2f},'
+                f'{rc["offstage_penalty"]:.2f},{rc["suicide_penalty"]:.2f},{rc["death_penalty"]:.2f},{rc["kill_reward"]:.2f},'
+                f'{counts_str},{probs_str}\n'
             )
 
 
 def _run_ppo_update(model, optimizer, memory, device,
                     gamma, lam, epsilon, epochs,
                     entropy_coef, diversity_coef):
-    states_b, cd_b, actions_b, rewards_b, values_b, \
+    cd_b, actions_b, rewards_b, values_b, \
         old_lp_b, dones_b = memory.get_batches()
 
     advantages, returns = compute_gae(rewards_b, values_b, dones_b, gamma, lam)
@@ -556,14 +545,13 @@ def _run_ppo_update(model, optimizer, memory, device,
     ent_val  = 0.0
 
     for _ in range(epochs):
-        s_t   = torch.FloatTensor(states_b).to(device)
         cd_t  = torch.FloatTensor(cd_b).to(device)
         a_t   = torch.LongTensor(actions_b).to(device)
         olp_t = torch.FloatTensor(old_lp_b).to(device)
         adv_t = torch.FloatTensor(advantages).to(device)
         ret_t = torch.FloatTensor(returns).to(device)
 
-        probs, vals = model(s_t, cd_t)
+        probs, vals = model(cd_t)
         probs = torch.clamp(probs, min=1e-6, max=1.0)
         probs = probs / probs.sum(dim=-1, keepdim=True)
 
@@ -578,9 +566,9 @@ def _run_ppo_update(model, optimizer, memory, device,
         actor_loss  = -torch.min(s1, s2).mean()
         critic_loss = nn.MSELoss()(vals.squeeze(), ret_t)
 
-        mean_probs    = probs.mean(dim=0)
-        mean_probs    = mean_probs / mean_probs.sum()
-        kl_to_target  = (target_dist * (target_dist.log() - mean_probs.log())).sum()
+        mean_probs   = probs.mean(dim=0)
+        mean_probs   = mean_probs / mean_probs.sum()
+        kl_to_target = (target_dist * (target_dist.log() - mean_probs.log())).sum()
         diversity_loss = kl_to_target
 
         loss = (actor_loss
