@@ -13,21 +13,15 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 import pickle
-import time
 import os
 from pynput import keyboard
-
-from src.screen_grab.grab import ScreenGrab
-from src.health_api.health import HealthAPI
-from src.controls.controls import Controls
-from src.player_location.player_detector import PlayerDetector
 
 # ── import your model and constants from train.py ────────────────────────────
 from run import ActorCritic, BrawlhallaEnv, ACTION_NAMES, NUM_ACTIONS, COMBINED_DATA_SIZE as INPUT_SIZE
 
 STARTING_LIVES  = 15
 DATASET_PATH    = 'bc_dataset_boosted_x.pkl'
-CHECKPOINT_PATH = 'checkpoints_14/ppo_latest.pth'
+CHECKPOINT_PATH = '../checkpoints_14/ppo_latest.pth'
 BC_EPOCHS       = 5
 BC_BATCH_SIZE   = 64
 BC_LR           = 0.0003
