@@ -7,7 +7,6 @@ import os
 from src.run.brawhalla_env import BrawlhallaEnv
 from src.run.ppo_actor_critic import ActorCritic
 from src.run.ppo_memory import PPOMemory
-from src.global_vars import STARTING_LIVES
 from global_vars import MONITOR
 from src.run.ppo_functions import _run_ppo_update
 
@@ -40,6 +39,7 @@ class PPOTrainer:
             max_steps=30000,
             edge_threshold=0.15,
             edge_mask=True,
+            starting_lives=15,
 
             # Logging settings
             log_every_n_steps=50,
@@ -89,7 +89,7 @@ class PPOTrainer:
         os.makedirs(self.log_dir, exist_ok=True)
 
         # Initialize components
-        self.env = BrawlhallaEnv(monitor=MONITOR, frame_skip=frame_skip, starting_lives=STARTING_LIVES)
+        self.env = BrawlhallaEnv(starting_lives=starting_lives, monitor=MONITOR, frame_skip=frame_skip)
         self.model = ActorCritic(input_size=COMBINED_DATA_SIZE, num_actions=NUM_ACTIONS).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.controls = Controls()

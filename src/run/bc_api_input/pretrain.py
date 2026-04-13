@@ -17,11 +17,11 @@ import os
 from pynput import keyboard
 
 # ── import your model and constants from train.py ────────────────────────────
-from run import ActorCritic, BrawlhallaEnv, ACTION_NAMES, NUM_ACTIONS, COMBINED_DATA_SIZE as INPUT_SIZE
+from run.train import ActorCritic, BrawlhallaEnv, ACTION_NAMES, NUM_ACTIONS, COMBINED_DATA_SIZE as INPUT_SIZE
 
 STARTING_LIVES  = 15
 DATASET_PATH    = 'bc_dataset_boosted_x.pkl'
-CHECKPOINT_PATH = '../checkpoints_14/ppo_latest.pth'
+CHECKPOINT_PATH = 'checkpoints_14/ppo_latest.pth'
 BC_EPOCHS       = 5
 BC_BATCH_SIZE   = 64
 BC_LR           = 0.0003

@@ -8,12 +8,12 @@ from src.health_api.health import HealthAPI
 from src.controls.controls import Controls
 import time
 from src.player_location.player_detector import PlayerDetector
-from src.global_vars import STARTING_LIVES, MONITOR
+from src.global_vars import MONITOR
 
 
 class BrawlhallaEnv:
 
-    def __init__(self, monitor=MONITOR, frame_skip=2, starting_lives=STARTING_LIVES):
+    def __init__(self, starting_lives, monitor=MONITOR, frame_skip=2):
         self.screen             = ScreenGrab(monitor=monitor)
         self.health_api         = HealthAPI(starting_lives=starting_lives)
         self.player_detector    = PlayerDetector(monitor=monitor)
