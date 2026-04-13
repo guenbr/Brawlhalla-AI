@@ -19,6 +19,7 @@ def run():
         max_steps=30000,
         edge_threshold=0.15,
         edge_mask=True,
+        starting_lives=15,
 
         # Logging settings
         log_every_n_steps=50,
