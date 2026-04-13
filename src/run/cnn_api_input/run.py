@@ -3,32 +3,28 @@ from src.run.train import PPOTrainer
 
 def run():
     trainer = PPOTrainer(
-        # Training hyperparameters
-        gamma=0.965,
+        gamma=0.97,
         lam=0.95,
-        epsilon=0.20,
-        epochs_per_update=4,
-        entropy_coef=0.003,
+        epsilon=0.10,
+        epochs_per_update=1,
+        entropy_coef=0.06,
         diversity_coef=0.0,
         episodes_per_update=4,
         num_episodes=500,
         learning_rate=0.00015,
 
-        # Environment settings
         frame_skip=2,
         max_steps=30000,
         edge_threshold=0.15,
-        edge_mask=True,
-        starting_lives=15,
-        use_cnn=False,
+        edge_mask=False,
+        starting_lives=5,
+        use_cnn=True,
 
-        # Logging settings
         log_every_n_steps=50,
-        checkpoint_dir='checkpoints_14',
-        log_dir='logs_14',
+        checkpoint_dir='checkpoints_9',
+        log_dir='logs_9',
 
-        # Warning thresholds
-        entropy_warning=0.5,
+        entropy_warning=0.3,
         entropy_random=1.85,
         max_prob_spam=0.60,
         action_spam_pct=40,

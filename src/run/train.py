@@ -40,6 +40,7 @@ class PPOTrainer:
             edge_threshold=0.15,
             edge_mask=True,
             starting_lives=15,
+            use_cnn=False,
 
             # Logging settings
             log_every_n_steps=50,
@@ -67,7 +68,7 @@ class PPOTrainer:
         self.max_steps = max_steps
         self.edge_threshold = edge_threshold
         self.edge_mask = edge_mask
-
+        self.use_cnn = use_cnn
         self.log_every_n_steps = log_every_n_steps
         self.checkpoint_dir = checkpoint_dir
         self.log_dir = log_dir
@@ -90,10 +91,23 @@ class PPOTrainer:
 
         # Initialize components
         self.env = BrawlhallaEnv(starting_lives=starting_lives, monitor=MONITOR, frame_skip=frame_skip)
-        self.model = ActorCritic(input_size=COMBINED_DATA_SIZE, num_actions=NUM_ACTIONS).to(self.device)
+        if use_cnn:
+            self.model = ActorCritic(
+                num_actions=NUM_ACTIONS,
+                use_cnn=True,
+                input_channels=2,
+                combined_data_size=8
+            ).to(self.device)
+        else:
+            self.model = ActorCritic(
+                num_actions=NUM_ACTIONS,
+                use_cnn=False,
+                input_size=COMBINED_DATA_SIZE
+            ).to(self.device)
+
+        self.memory = PPOMemory(use_cnn=use_cnn)
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.controls = Controls()
-        self.memory = PPOMemory()
 
         # Training state
         self.p1_wins = 0
@@ -150,12 +164,26 @@ class PPOTrainer:
 
         return action_probs
 
-    def select_action(self, combined_data):
+    def select_action(self, *args):
         """Select action based on current policy"""
-        cd_t = torch.FloatTensor(combined_data).unsqueeze(0).to(self.device)
+        # Parse inputs based on mode
+        if self.use_cnn:
+            state, combined_data = args
+            s_t = torch.FloatTensor(state).unsqueeze(0).to(self.device)
+            cd_t = torch.FloatTensor(combined_data).unsqueeze(0).to(self.device)
+        else:
+            combined_data = args[0]
+            cd_t = torch.FloatTensor(combined_data).unsqueeze(0).to(self.device)
 
+        # Common forward pass and action selection
         with torch.no_grad():
-            action_probs, value = self.model(cd_t)
+            # Forward pass (conditional on inputs)
+            if self.use_cnn:
+                action_probs, value = self.model(s_t, cd_t)
+            else:
+                action_probs, value = self.model(cd_t)
+
+            # Process probabilities (same for both modes)
             action_probs = torch.clamp(action_probs, min=1e-6, max=1.0)
             action_probs = action_probs / action_probs.sum(dim=-1, keepdim=True)
 
