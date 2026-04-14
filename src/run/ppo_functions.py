@@ -3,21 +3,36 @@ import torch.nn as nn
 import numpy as np
 
 TARGET_ACTION_DIST = torch.tensor([
-    0.08,   # neutral
-    0.10,   # move_left
-    0.10,   # move_right
-    0.10,   # jump
-    0.12,   # light
-    0.10,   # heavy
-    0.08,   # dodge
-    0.14,   # left_heavy
-    0.14,   # right_heavy
-    0.07,   # left_light
-    0.07,   # right_light
+    0.08,
+    0.10,
+    0.10,
+    0.10,
+    0.12,
+    0.10,
+    0.08,
+    0.14,
+    0.14,
+    0.07,
+    0.07,
 ], dtype=torch.float32)
 
 
-def compute_gae(rewards, values, dones, gamma=0.995, lam=0.95):
+def compute_gae(rewards: list[float], values: list[float], dones: list[bool], gamma: float = 0.995, lam: float = 0.95) -> tuple[list[float], list[float]]:
+    """
+    Computes Generalized Advantage Estimation (GAE) over a collected trajectory
+
+    Args:
+        rewards (list[float]): rewards collected at each timestep
+        values  (list[float]): critic value estimates at each timestep
+        dones   (list[bool]):  episode termination flags at each timestep
+        gamma   (float):       discount factor for future rewards
+        lam     (float):       GAE lambda, controls bias-variance tradeoff
+
+    Returns:
+        tuple containing:
+            - advantages (list[float]): GAE advantage estimates per timestep
+            - returns    (list[float]): discounted returns (advantage + value) per timestep
+    """
     advantages, gae = [], 0
     for t in reversed(range(len(rewards))):
         nxt   = 0 if t == len(rewards) - 1 else values[t + 1]
@@ -28,9 +43,29 @@ def compute_gae(rewards, values, dones, gamma=0.995, lam=0.95):
     return advantages, returns
 
 
-def _run_ppo_update(model, optimizer, memory, device,
-                    gamma, lam, epsilon, epochs,
-                    entropy_coef, diversity_coef=0.0):
+def _run_ppo_update(model: nn.Module, optimizer: torch.optim.Optimizer, memory, device: torch.device,
+                    gamma: float, lam: float, epsilon: float, epochs: int,
+                    entropy_coef: float, diversity_coef: float = 0.0) -> tuple[float, float]:
+    """
+    Runs a full PPO update over the collected memory buffer
+
+    Args:
+        model        (nn.Module):   actor-critic network to update
+        optimizer    (Optimizer):   torch optimizer tied to the model
+        memory       (PPOMemory):   buffer holding the collected trajectory data
+        device       (torch.device): CPU or CUDA device to run tensors on
+        gamma        (float):       discount factor passed to GAE
+        lam          (float):       GAE lambda passed to GAE
+        epsilon      (float):       PPO clip range for the probability ratio
+        epochs       (int):         number of passes over the collected batch
+        entropy_coef (float):       coefficient scaling the entropy bonus in the loss
+        diversity_coef (float):     unused coefficient reserved for action diversity loss
+
+    Returns:
+        tuple containing:
+            - loss_val (float): total loss from the final epoch
+            - ent_val  (float): mean policy entropy from the final epoch
+    """
     batches = memory.get_batches()
 
     if memory.use_cnn:
