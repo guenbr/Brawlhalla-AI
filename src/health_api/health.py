@@ -8,7 +8,7 @@ class HealthAPI:
     Handles extracting health information from a screenshot of a game state
     """
     def __init__(self, starting_lives: int):
-        # Initialize varibales
+        # Initialize variables
         self.health = np.array([100, 100])
         # Pixel to monitor for health status
         self.coord1 = (2383, 119, 1, 1)

@@ -12,36 +12,44 @@ from src.global_vars import MONITOR
 
 
 class BrawlhallaEnv:
-
+    """
+    Brawhalla Environemnt that the NN and PPO can interact with, a self-built gym
+    """
     def __init__(self, starting_lives, monitor=MONITOR, frame_skip=2, data_size=14):
-        self.screen             = ScreenGrab(monitor=monitor)
-        self.health_api         = HealthAPI(starting_lives=starting_lives)
-        self.player_detector    = PlayerDetector(monitor=monitor)
-        self.controls           = Controls()
-        self.starting_lives     = starting_lives
-        self.prev_health        = np.array([100.0, 100.0])
-        self.frame_skip         = frame_skip
-        self.first_reset        = True
-        self.recent_actions     = deque(maxlen=20)
+        # Initialize classes and vars
+        self.screen = ScreenGrab(monitor=monitor)
+        self.health_api = HealthAPI(starting_lives=starting_lives)
+        self.player_detector = PlayerDetector(monitor=monitor)
+        self.controls = Controls()
+        self.starting_lives = starting_lives
+        self.prev_health = np.array([100.0, 100.0])
+        self.frame_skip = frame_skip
+        self.first_reset = True
+        self.recent_actions = deque(maxlen=20)
         self.episode_start_time = None
-        self.prev_combined_data = np.zeros(14, dtype=np.float32)  # flat shape
+        self.prev_combined_data = np.zeros(14, dtype=np.float32)
         self.eight_val = True if data_size==8 else False
 
-    def reset(self):
+    def reset(self) -> np.ndarray:
+        """
+        Resets physical Brawhallla game and additional medata
+
+        Returns:
+            combined_data (np.ndarray): Array containing metadata of game state
+        """
+
         if self.first_reset:
             self.first_reset = False
         else:
-            print("\nResetting game")
+            # Reset game state and metadata
             self.controls.release_all()
             self.controls.reset_game()
-            self.health_api.health               = np.array([100.0, 100.0])
-            self.health_api.lives                = np.array([self.starting_lives,
-                                                              self.starting_lives])
+            self.health_api.health = np.array([100.0, 100.0])
+            self.health_api.lives = np.array([self.starting_lives, self.starting_lives])
             self.health_api.last_valid_health_p1 = 100
             self.health_api.last_valid_health_p2 = 100
-            print("Game reset complete")
 
-        self.prev_health        = np.array([100.0, 100.0])
+        self.prev_health = np.array([100.0, 100.0])
         self.recent_actions.clear()
         self.episode_start_time = time.time()
         combined_data, _, _ = self.capture_frame()
@@ -59,7 +67,17 @@ class BrawlhallaEnv:
 
         return combined_data
 
-    def capture_frame(self):
+    def capture_frame(self) -> tuple[np.ndarray, bool, bool]:
+        """
+        Capture game frame and pass through API's for processing
+
+        Returns:
+             tuple containing:
+                - combined_data (np.ndarray): game metadata from API
+                - is_player_dead (bool): True if there is a player dead, False if not
+                - is_game_over (bool): True if game is over, False if not
+        """
+
         # Grab non-grey scaled frame for downstream API processing
         full_frame = self.screen.grab(greyscale=False)
 
@@ -72,19 +90,21 @@ class BrawlhallaEnv:
         normalized_health = health_vector / 100.0
         normalized_lives = lives / float(self.starting_lives)
 
+        # Normalize location coordinates
         location_matrix = np.array(location_matrix, dtype=np.float32)
         location_matrix[:, 0] = location_matrix[:, 0] / 2560.0
         location_matrix[:, 1] = location_matrix[:, 1] / 1440.0
         location_matrix = np.clip(location_matrix, 0, 1)
 
+        # Safety check
         if (lives[0] <= 0 or lives[1] <= 0) and not is_game_over:
-            print("Forcing game over (a player's lives reached 0)")
             is_game_over = True
 
         PLATFORM_LEFT  = 0.319
         PLATFORM_RIGHT = 0.678
         PLATFORM_Y     = 0.581
 
+        # Feature engineer additional metrics
         p1_x, p1_y = location_matrix[0, 0], location_matrix[0, 1]
         p2_x, p2_y = location_matrix[1, 0], location_matrix[1, 1]
 
@@ -103,18 +123,33 @@ class BrawlhallaEnv:
             on_platform,
         ], dtype=np.float32)
 
+        # Combine all metadata
         scraped_data = np.stack([normalized_health, normalized_lives], axis=0).T
-        # 2D combined for reference (2, 4): [health, lives, x, y] per player
         combined_2d  = np.concatenate([scraped_data, location_matrix], axis=1)
 
-        # Flat layout (14,): [h0,l0,x0,y0, h1,l1,x1,y1, dx,dy,dist,dist_left,dist_right,on_platform]
+        # If only want eight values
         if self.eight_val:
             combined_data = combined_2d.flatten()
         else:
+            # Else combine everything
             combined_data = np.concatenate([combined_2d.flatten(), derived])
+
         return combined_data, is_player_dead, is_game_over
 
-    def step(self, action):
+    def step(self, action: int) -> tuple[np.ndarray, float, bool, dict]:
+        """
+        Executes action, calculates reward
+
+        Args;
+            action (int): index of action to execute
+
+        Returns:
+            tuple containing:
+                - combined_data (np.ndarray): game metadata
+                - total_reward (float): reward of executing the action in the frame
+                - is_game_over (bool): True if game is over, False if not
+                - info (dict): game state metadata used for logging
+        """
         total_reward = 0
 
         # Execute the action using Controls Class
@@ -130,8 +165,7 @@ class BrawlhallaEnv:
         lives  = combined_data[[1, 5]] * float(self.starting_lives)
 
         # Calculate reward
-        total_reward += self.calculate_reward(health, lives, is_player_dead,
-                                              is_game_over, combined_data, action)
+        total_reward += self.calculate_reward(health, is_player_dead, combined_data)
 
         # Some additional logic for detecting if two players died simultaneously
         if is_player_dead:
@@ -151,10 +185,10 @@ class BrawlhallaEnv:
                     cur_p1 = int(temp_lives_raw[0])
                     cur_p2 = int(temp_lives_raw[1])
                     if cur_p1 < snap_p1 or cur_p2 < snap_p2:
-                        # Processs reward and etc. again
+                        # Process reward and etc. again
                         temp_health = self.health_api.health.copy()
                         add_r = self.calculate_reward(
-                            temp_health, temp_lives_raw, True, False, combined_data, action)
+                            temp_health,  False, combined_data)
                         total_reward += add_r
                         health  = temp_health
                         lives   = temp_lives_raw
@@ -172,7 +206,18 @@ class BrawlhallaEnv:
                 'winner': None, 'is_player_dead': is_player_dead}
         return combined_data, total_reward, is_game_over, info
 
-    def calculate_reward(self, health, lives, is_player_dead, is_game_over, combined_data, action) -> float:
+    def calculate_reward(self, health: np.ndarray, is_player_dead: bool, combined_data: np.ndarray) -> float:
+        """
+        Calculates reward of an action given game metadata
+
+        Args:
+            health ( np.ndarray,): current health of our both players
+            is_player_dead (bool): True if game is over, False if not
+            combined_data (np.ndarray): game metadata
+
+        Returns:
+            reward (float): reward of given action in state
+        """
         reward = 0
 
         # Calculate health difference from previous frame
@@ -193,18 +238,16 @@ class BrawlhallaEnv:
 
         reward += offstage_pen + dealt_r + taken_r
 
-        # Used for CSV metrics save, see where majority of rewrads came from
+        # Used for CSV metrics save, see where majority of rewards came from
         self.reward_components['offstage_penalty'] += offstage_pen
         self.reward_components['damage_dealt']     += dealt_r
         self.reward_components['damage_taken']     += taken_r
 
         if is_player_dead:
-            print(f'  P1 death | damage_taken={damage_taken:.1f}')
             # Punish suicides more than normal deaths, leads to less falling offstage
             if damage_taken > 50:
                 reward -= 10
                 self.reward_components['suicide_penalty'] -= 10
-                print('suicide reward')
             if health[0] <= 1:
                 reward -= 3
                 self.reward_components['death_penalty'] -= 3
@@ -212,7 +255,6 @@ class BrawlhallaEnv:
             if health[1] <= 1:
                 reward += 40
                 self.reward_components['kill_reward'] += 10
-                print('kill reward')
         # Set state var to current, used for diff for next calculation
         self.prev_combined_data = combined_data.copy()
         return reward
