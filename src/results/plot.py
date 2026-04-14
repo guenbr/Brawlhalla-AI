@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load CSV into DataFrame
-df = pd.read_csv("episodes.csv")
+df = pd.read_csv("data/episodes.csv")
 
 
 def plot_reward_over_episode():
@@ -21,7 +21,7 @@ def plot_reward_over_episode():
     plt.legend()
     plt.tight_layout()
     plt.grid()
-    plt.savefig("reward_over_episode.png", dpi=150)
+    plt.savefig("plots/reward_over_episode.png", dpi=150)
     plt.show()
 
 
@@ -37,13 +37,8 @@ def plot_kd():
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    plt.savefig("kd_over_episode.png", dpi=150)
+    plt.savefig("plots/kd_over_episode.png", dpi=150)
     plt.show()
-
-
-
-
-
 
 
 def plot_action_dist():
@@ -67,7 +62,7 @@ def plot_action_dist():
     plt.legend(loc='upper left', fontsize=5.4)
     plt.grid(linestyle=':', linewidth=0.5)
     plt.tight_layout()
-    plt.savefig("action_dist.png", dpi=150)
+    plt.savefig("plots/action_dist.png", dpi=150)
     plt.show()
 
 
@@ -87,7 +82,7 @@ def plot_entropy_over_episode():
     plt.legend()
     plt.tight_layout()
     plt.grid()
-    plt.savefig("entropy_over_episode.png", dpi=150)
+    plt.savefig("plots/ntropy_over_episode.png", dpi=150)
     plt.show()
 
 def plot_entropy_reward_normalized():
@@ -110,18 +105,14 @@ def plot_entropy_reward_normalized():
     plt.legend(loc='upper left', fontsize=8)
     plt.tight_layout()
     plt.grid()
-    plt.savefig("entropy_reward_normalized.png", dpi=150)
+    plt.savefig("plots/entropy_reward_normalized.png", dpi=150)
     plt.show()
 
-plot_entropy_reward_normalized()
-
-
 def main():
-    # plot_reward_over_episode()
-    # plot_kd()
-    # plot_action_dist()
-    # plot_entropy_over_episode()
-    print(df['reward'].mean())
-
+    plot_reward_over_episode()
+    plot_kd()
+    plot_action_dist()
+    plot_entropy_over_episode()
+    plot_entropy_reward_normalized()
 
 main()

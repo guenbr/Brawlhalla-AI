@@ -210,6 +210,12 @@ class BrawlhallaEnv:
         """
         Calculates reward of an action given game metadata
 
+
+        NOTE:
+            This is a final version of our reward function. We tweaked with this probably over
+            30 times throughout 200 hours of training, but we found out the simpler the reward func,
+            the less exploiting the agent behaved.
+
         Args:
             health ( np.ndarray,): current health of our both players
             is_player_dead (bool): True if game is over, False if not
