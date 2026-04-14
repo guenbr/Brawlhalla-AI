@@ -31,7 +31,7 @@ class Controls:
             'move_down': 's',
         }
 
-    def release_all(self):
+    def release_all(self) -> None:
         """
         Releases all keys
         """
@@ -42,7 +42,7 @@ class Controls:
                 except:
                     pass
 
-    def execute_action(self, action_id):
+    def execute_action(self, action_id: int) -> None:
         """
         Converts an action ID from the agent into a corresponding key press and executes it.
 
@@ -139,10 +139,13 @@ class Controls:
             pyautogui.keyUp('d')
 
     @staticmethod
-    def reset_game():
+    def reset_game() -> bool:
         """
         Resets the game by pressing the 'c' key multiple times with specific delays to navigate
         through the game's menus and start a new match
+
+        Returns:
+            bool: True when game is reset
         """
 
         # The initial delay allows the player to switch to the game window
