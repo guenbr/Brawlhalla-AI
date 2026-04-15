@@ -47,7 +47,80 @@ Brawlhalla is a free-to-play platform fighter similar to Super Smash Bros. Playe
 - **Online ranked play** — deploy an agent into live PvP and benchmark it against real players vs. CPU players
 
 ---
+# Training Locally
 
+## Prerequisites
+
+- Steam account with Brawlhalla installed
+- Python environment with pip
+
+## Installation
+
+### 1. Install Brawlhalla
+
+Download and install Brawlhalla through Steam:
+
+[https://store.steampowered.com/app/291550/Brawlhalla/](https://store.steampowered.com/app/291550/Brawlhalla/)
+
+### 2. Install Python Dependencies
+
+Navigate to the project directory and install the required packages:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Monitor Settings
+
+Locate `src/global_vars.py` and set the `MONITOR` variable to match the display running Brawlhalla.
+
+## Running the Training Environment
+
+### 1. Launch Brawlhalla
+
+Open Brawlhalla and start a couch party offline game.
+
+### 2. Select a Training Model
+
+Navigate to the `src/run` directory and choose one of the available models, or create your own using the PPOTrainer class:
+
+- `bc_api_input/run.py`
+- `cnn_api_input/run.py`
+- `eight_val/run.py`
+- `YOUR_MODEL_DIRECTORY/run.py`
+### 3. Start Training
+
+Once the couch party game is confirmed and loading, execute your selected model:
+
+```bash
+python src/run/bc_api_input/run.py
+```
+
+or
+
+```bash
+python src/run/cnn_api_input/run.py
+```
+
+or
+
+```bash
+python src/run/eight_val/run.py
+```
+
+or
+
+```bash
+python src/run/YOUR_MODEL_DIRECTORY/run.py
+```
+
+The environment will operate autonomously from this point forward. You may leave the training process running unattended.
+
+## Notes
+
+Ensure that Brawlhalla is actively loading the couch party game before starting the training script to ensure proper initialization.
+
+---
 ## 📚 Related Work
 
 - [ML-Brawlhalla by Tiger767](https://github.com/Tiger767/ML-Brawlhalla?tab=readme-ov-file)
