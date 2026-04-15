@@ -46,14 +46,6 @@ We trained three variants of the PPO agent, each using a different input represe
 - **CNN + API Input** — raw screen frames processed through a convolutional network, concatenated with the 8-value API vector ([`src/run/cnn_api_input/`](src/run/cnn_api_input/))
 
 ---
-
-## Stretch Goals
-
-- **Character-specific models** — each character has a unique playstyle that may warrant its own trained agent
-- **Self-play** — two agents competing against each other on one local device
-- **Online ranked play** — deploy an agent into live PvP and benchmark it against real players vs. CPU players
-
----
 # Training Locally
 
 ## Prerequisites
