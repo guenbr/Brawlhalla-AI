@@ -130,7 +130,6 @@ Ensure that Brawlhalla is actively loading the couch party game before starting 
 - **Reward Function Refinement**: Iterate on the reward system to find the most optimal reward function
 
 - **Multi-Character**: Test the model across different characters, as movement speed, attack damage, and shields differ amongst characters
-—
 
 ---
 ## 📚 Related Work
