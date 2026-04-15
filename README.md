@@ -121,6 +121,18 @@ The environment will operate autonomously from this point forward. You may leave
 Ensure that Brawlhalla is actively loading the couch party game before starting the training script to ensure proper initialization.
 
 ---
+## Future Work
+
+- **Continue Training**: Continue training the agent to see how it performs beyond our current episodes
+
+- **Higher Difficulty CPUs**: Evaluate how the agent performs against harder CPU opponents
+
+- **Reward Function Refinement**: Iterate on the reward system to find the most optimal reward function
+
+- **Multi-Character**: Test the model across different characters, as movement speed, attack damage, and shields differ amongst characters
+—
+
+---
 ## 📚 Related Work
 
 - [ML-Brawlhalla by Tiger767](https://github.com/Tiger767/ML-Brawlhalla?tab=readme-ov-file)
