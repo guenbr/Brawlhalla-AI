@@ -1,6 +1,6 @@
 # Brawlhalla AI Agent
 
-A reinforcement learning agent trained to play **Brawlhalla** using CNN-based visual feature extraction. The agent learns core mechanics, strategy, and split-second decision-making to compete at a competent level — with the goal of a live gameplay demo on demo day.
+A reinforcement learning agent trained to play **Brawlhalla** using a PPO Actor Critic that takes in values of game state variables using feature extraction through various subclasses. The agent learns core gameplay mechanics and strategy to compete against the CPU. 
 
 ---
 
