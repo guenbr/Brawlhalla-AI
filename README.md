@@ -4,7 +4,7 @@ A reinforcement learning agent trained to play **Brawlhalla** using CNN-based vi
 
 ---
 
-## 🎮 About Brawlhalla
+## About Brawlhalla
 
 Brawlhalla is a free-to-play platform fighter similar to Super Smash Bros. Players knock opponents off the stage by building up their damage percentage, causing them to fly further when hit.
 
@@ -17,13 +17,17 @@ Brawlhalla is a free-to-play platform fighter similar to Super Smash Bros. Playe
 
 ---
 
-## 🎥 Presentation
+## Presentation
 
 - [Presentation Video](https://drive.google.com/file/d/1EDIkbhnhX2mcYtsJLOkp9HlfbWn-ojaj/view?usp=sharing)
 
+## Slideshow
+
+- [`BrawlhallaAIAgentSlideshow.pdf`](BrawlhallaAIAgentSlideshow.pdf)
+
 --- 
 
-## 🤖 What the AI Needs to Learn
+## What the AI Needs to Learn
 
 - Land hits while avoiding damage
 - Control the center of the stage
@@ -32,15 +36,18 @@ Brawlhalla is a free-to-play platform fighter similar to Super Smash Bros. Playe
 
 ---
 
-## 🧠 Approach
+## Approaches
 
-- **Feature Extraction:** CNN processing raw game frames captured directly from the Brawlhalla client (macOS compatible)
-- **Training:** Reinforcement learning to teach the agent mechanics, combos, stage control, and adaptive strategy
-- **Environment:** Custom OpenAI Gym environment
+We trained three variants of the PPO agent, each using a different input representation:
+
+- **8-Value API Input** — flat vector of health, lives, and (x, y) position for both players ([`src/run/eight_val/`](src/run/eight_val/))
+- **14-Value API Input** — extends the 8-value vector with 6 derived spatial features (distance to opponent, platform edges, on-platform flag) ([`src/run/bc_api_input/`](src/run/bc_api_input/))
+  - Also supports behavioral cloning pretraining from recorded human gameplay
+- **CNN + API Input** — raw screen frames processed through a convolutional network, concatenated with the 8-value API vector ([`src/run/cnn_api_input/`](src/run/cnn_api_input/))
 
 ---
 
-## 🚀 Stretch Goals
+## Stretch Goals
 
 - **Character-specific models** — each character has a unique playstyle that may warrant its own trained agent
 - **Self-play** — two agents competing against each other on one local device
@@ -132,13 +139,13 @@ Ensure that Brawlhalla is actively loading the couch party game before starting 
 - **Multi-Character**: Test the model across different characters, as movement speed, attack damage, and shields differ amongst characters
 
 ---
-## 📚 Related Work
+## Related Work
 
 - [ML-Brawlhalla by Tiger767](https://github.com/Tiger767/ML-Brawlhalla?tab=readme-ov-file)
 
 ---
 
-## 👥 Collaborators
+## Collaborators
 
 - Bryan Guen
 - Ethan Xin
